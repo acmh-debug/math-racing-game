@@ -1,879 +1,147 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>體感數學極速賽車 - 分數/小數/百分數車神爭霸戰</title>
-
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Font Awesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <!-- Canvas & Tensorflow Pose Detection CDN Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-
-  <!-- Tailwind Custom Colors -->
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            cyberBlue: '#00f0ff',
-            cyberPink: '#ff007f',
-            cyberYellow: '#ffe600',
-            cyberDark: '#0b0f19',
-            cyberCard: '#161e31'
-          },
-          fontFamily: {
-            sans: ['Inter', 'Microsoft JhengHei', 'sans-serif']
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學校園體感賽車</title>
+    <!-- MediaPipe & TensorFlow.js libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
         }
-      }
-    }
-  </script>
 
-  <style>
-    body {
-      background-color: #0b0f19;
-      color: #ffffff;
-      overflow-x: hidden;
-      touch-action: manipulation;
-    }
-    canvas {
-      display: block;
-    }
-    .neon-text-blue { text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff; }
-    .neon-text-pink { text-shadow: 0 0 10px #ff007f, 0 0 20px #ff007f; }
-    .neon-text-yellow { text-shadow: 0 0 10px #ffe600, 0 0 20px #ffe600; }
-    .neon-border-blue { box-shadow: 0 0 15px rgba(0, 240, 255, 0.5); }
-    .neon-border-pink { box-shadow: 0 0 15px rgba(255, 0, 127, 0.5); }
-    .neon-border-yellow { box-shadow: 0 0 15px rgba(255, 230, 0, 0.5); }
-    .mirror-video { transform: scaleX(-1); }
-  </style>
+        /* Google Sites 嵌入提示列 */
+        #iframe-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(90deg, #ff416c, #ff4b2b);
+            color: white;
+            text-align: center;
+            padding: 12px 10px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 9999;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #iframe-warning a {
+            background-color: #ffffff;
+            color: #ff416c;
+            padding: 6px 16px;
+            margin-left: 12px;
+            border-radius: 20px;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        #iframe-warning a:hover {
+            transform: scale(1.05);
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: #0f3460;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 鏡頭視窗 */
+        #webcam-container {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 160px;
+            height: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #e94560;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            background: #000;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* 鏡像翻轉 */
+        }
+    </style>
 </head>
-<body class="bg-cyberDark min-h-screen flex flex-col justify-between font-sans select-none">
+<body>
 
-  <!-- Header / Navigation Bar -->
-  <header class="w-full bg-cyberCard/80 border-b border-cyberBlue/30 px-4 py-3 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyberPink to-cyberBlue flex items-center justify-center text-xl font-bold text-black shadow-lg">
-          <i class="fa-solid font-black fa-car-side"></i>
-        </div>
-        <div>
-          <h1 class="text-xl md:text-2xl font-black italic tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyberBlue via-white to-cyberPink">
-            體感數學賽車 <span class="text-xs text-cyberYellow not-italic px-2 py-0.5 border border-cyberYellow/40 rounded-full">車神爭霸戰</span>
-          </h1>
-          <p class="text-xs text-slate-400">2 / 4 / 5 / 8 分數家族特訓 | Google Sheets 即時榜</p>
-        </div>
-      </div>
-
-      <div class="flex items-center space-x-2">
-        <button id="btnLeaderboard" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyberYellow/20 to-amber-500/20 border border-cyberYellow text-cyberYellow hover:bg-cyberYellow hover:text-black font-bold text-sm transition flex items-center space-x-1.5 shadow-lg">
-          <i class="fa-solid fa-crown text-amber-300"></i>
-          <span>車神榜</span>
-        </button>
-        <button id="btnCameraSetup" class="px-3 py-1.5 rounded-lg bg-cyberCard border border-cyberBlue/50 text-cyberBlue hover:bg-cyberBlue/10 text-sm font-semibold transition flex items-center space-x-1">
-          <i class="fa-solid fa-sliders"></i>
-          <span class="hidden sm:inline">體感設置</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Game Container -->
-  <main class="relative flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 flex flex-col items-center justify-center">
-
-    <!-- START SCREEN / LOGIN MODAL -->
-    <div id="startModal" class="absolute inset-0 z-40 bg-cyberDark/95 backdrop-blur-md flex items-center justify-center p-4">
-      <div class="bg-cyberCard border-2 border-cyberBlue/60 rounded-2xl p-6 md:p-8 max-w-md w-full neon-border-blue text-center">
-        <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-cyberBlue/20 flex items-center justify-center text-cyberBlue text-4xl border border-cyberBlue/50">
-          <i class="fa-solid fa-gamepad"></i>
-        </div>
-        <h2 class="text-2xl font-black text-white mb-2">輸入資料，挑戰車神榜！</h2>
-        <p class="text-sm text-slate-300 mb-6">成績將即時記錄至 Google Sheets 試算表</p>
-
-        <form id="studentForm" class="space-y-4 text-left">
-          <div>
-            <label class="block text-xs font-bold text-cyberBlue mb-1">學生姓名 Student Name</label>
-            <input type="text" id="studentName" required placeholder="例如：張小明" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyberBlue">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-cyberBlue mb-1">班別 Class</label>
-            <input type="text" id="studentClass" required placeholder="例如：4A / 5B" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-cyberBlue uppercase">
-          </div>
-
-          <div class="pt-2">
-            <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyberBlue to-cyberPink font-black text-black text-lg hover:opacity-90 transition shadow-lg flex items-center justify-center space-x-2">
-              <i class="fa-solid fa-flag-checkered"></i>
-              <span>發動引擎！進入賽道</span>
-            </button>
-          </div>
-        </form>
-      </div>
+    <!-- 專為 Google Sites 內嵌設計的警告跳轉條 -->
+    <div id="iframe-warning">
+        ⚠️ 體感鏡頭需要獨立頁面權限！
+        <a href="https://acmh-debug.github.io/math-racing-game/" target="_blank">點此開啟全螢幕體感模式 🚀</a>
     </div>
 
-    <!-- HUD OVERLAY -->
-    <div id="gameHUD" class="w-full max-w-4xl bg-slate-900/90 border border-cyberBlue/40 rounded-2xl p-3 sm:p-4 mb-2 shadow-2xl backdrop-blur flex flex-col space-y-3">
-      <!-- Top Info Row -->
-      <div class="flex items-center justify-between text-xs sm:text-sm font-bold border-b border-slate-800 pb-2">
-        <div class="flex items-center space-x-2">
-          <span class="text-slate-400">賽手:</span>
-          <span id="hudPlayer" class="text-cyberBlue">未登入</span>
-          <span id="hudClass" class="text-xs px-2 py-0.5 bg-slate-800 rounded text-slate-300">--</span>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="webcam-container">
+            <!-- 加入 playsinline, autoplay, muted 確保 iOS / iPad 相容 -->
+            <video id="webcam" autoplay playsinline muted></video>
         </div>
-        <div class="flex items-center space-x-4">
-          <div><i class="fa-solid fa-star text-cyberYellow mr-1"></i>得分: <span id="hudScore" class="text-cyberYellow text-base">0</span></div>
-          <div><i class="fa-solid fa-heart text-cyberPink mr-1"></i>血量: <span id="hudHP" class="text-cyberPink text-base">❤️❤️❤️</span></div>
-        </div>
-      </div>
-
-      <!-- Current Question Box -->
-      <div class="bg-gradient-to-r from-cyberDark via-cyberCard to-cyberDark border border-cyberPink/50 rounded-xl p-3 text-center relative overflow-hidden">
-        <div class="text-xs text-cyberPink font-bold uppercase tracking-wider mb-1">Current Question 數值換算</div>
-        <div id="questionText" class="text-2xl sm:text-3xl font-black text-white neon-text-blue min-h-[48px] flex items-center justify-center">
-          準備開始...
-        </div>
-        <div class="text-xs text-slate-400 mt-1">傾斜頭部控制賽車駛入正確車道！</div>
-      </div>
     </div>
 
-    <!-- MAIN RACING CANVAS & WEBCAM CONTAINER -->
-    <div class="relative w-full max-w-4xl aspect-[16/9] bg-black rounded-2xl overflow-hidden border-2 border-cyberBlue/50 shadow-2xl flex items-center justify-center">
-      
-      <!-- Canvas -->
-      <canvas id="raceCanvas" class="w-full h-full object-cover"></canvas>
-
-      <!-- WEBCAM PIP OVERLAY -->
-      <div id="cameraPIP" class="absolute top-3 right-3 w-32 sm:w-44 bg-slate-900/90 border-2 border-cyberBlue rounded-xl overflow-hidden shadow-2xl backdrop-blur">
-        <div class="bg-cyberBlue/20 px-2 py-1 text-[10px] text-cyberBlue font-bold flex justify-between items-center border-b border-cyberBlue/30">
-          <span><i class="fa-solid fa-video mr-1"></i>AI 體感鏡頭</span>
-          <span id="poseStatus" class="text-emerald-400 font-mono">載入中</span>
-        </div>
-        <div class="relative w-full aspect-video bg-slate-950 flex items-center justify-center">
-          <video id="webcamVideo" class="w-full h-full object-cover mirror-video" playsinline muted autoplay></video>
-          <canvas id="poseCanvas" class="absolute inset-0 w-full h-full object-cover mirror-video pointer-events-none"></canvas>
-          <div class="absolute inset-0 border-x-2 border-dashed border-cyberYellow/30 pointer-events-none"></div>
-        </div>
-        <div class="p-1 bg-slate-900 text-center border-t border-slate-800">
-          <div class="text-[10px] text-slate-400">目前頭部方向</div>
-          <div id="headDirectionText" class="text-xs font-black text-cyberYellow">CENTER (中)</div>
-        </div>
-      </div>
-
-      <!-- IPAD TOUCH CONTROLS OVERLAY -->
-      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center space-x-3 bg-slate-900/80 p-2 rounded-2xl border border-slate-700/80 backdrop-blur z-20">
-        <button id="btnLeft" class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-cyberBlue/20 border-2 border-cyberBlue text-cyberBlue text-xl font-bold flex flex-col items-center justify-center active:scale-95 transition">
-          <i class="fa-solid fa-arrow-left"></i>
-          <span class="text-[10px]">左車道</span>
-        </button>
-        <button id="btnCenter" class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-800 border-2 border-slate-600 text-slate-300 text-xl font-bold flex flex-col items-center justify-center active:scale-95 transition">
-          <i class="fa-solid fa-arrows-to-dot"></i>
-          <span class="text-[10px]">中車道</span>
-        </button>
-        <button id="btnRight" class="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-cyberPink/20 border-2 border-cyberPink text-cyberPink text-xl font-bold flex flex-col items-center justify-center active:scale-95 transition">
-          <i class="fa-solid fa-arrow-right"></i>
-          <span class="text-[10px]">右車道</span>
-        </button>
-      </div>
-
-      <!-- GAME OVER OVERLAY -->
-      <div id="gameOverModal" class="hidden absolute inset-0 z-30 bg-cyberDark/90 backdrop-blur flex flex-col items-center justify-center p-6 text-center">
-        <div class="w-20 h-20 rounded-full bg-cyberPink/20 border-2 border-cyberPink text-cyberPink flex items-center justify-center text-4xl mb-3 animate-bounce">
-          <i class="fa-solid fa-trophy"></i>
-        </div>
-        <h3 class="text-3xl font-black text-white mb-1">挑戰完成！</h3>
-        <p class="text-sm text-slate-300 mb-4">你的成績已上傳至 Google Sheet 車神榜！</p>
-
-        <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-4 w-full max-w-xs mb-6 text-left space-y-2 text-sm">
-          <div class="flex justify-between"><span class="text-slate-400">賽手姓名:</span><span id="resName" class="font-bold text-cyberBlue">--</span></div>
-          <div class="flex justify-between"><span class="text-slate-400">班別 Class:</span><span id="resClass" class="font-bold text-white">--</span></div>
-          <div class="flex justify-between"><span class="text-slate-400">最終得分:</span><span id="resScore" class="font-bold text-cyberYellow text-lg">0</span></div>
-          <div class="flex justify-between"><span class="text-slate-400">日期:</span><span id="resDate" class="font-bold text-slate-300">--</span></div>
-        </div>
-
-        <div class="flex space-x-3">
-          <button id="btnRestart" class="px-6 py-3 rounded-xl bg-gradient-to-r from-cyberBlue to-cyberPink font-black text-black hover:opacity-90 transition">
-            <i class="fa-solid fa-rotate-right mr-1"></i> 再戰一次
-          </button>
-          <button id="btnViewRank" class="px-6 py-3 rounded-xl bg-slate-800 border border-cyberYellow text-cyberYellow font-bold hover:bg-cyberYellow/10 transition">
-            <i class="fa-solid fa-crown mr-1"></i> 查看車神榜
-          </button>
-        </div>
-      </div>
-    </div>
-  </main>
-
-  <!-- GOD OF RACING LEADERBOARD MODAL (車神殿堂榜) -->
-  <div id="leaderboardModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
-    <div class="bg-cyberCard border-2 border-cyberYellow/80 rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl neon-border-yellow">
-      
-      <!-- Modal Header -->
-      <div class="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-full bg-cyberYellow/20 border border-cyberYellow flex items-center justify-center text-cyberYellow text-xl">
-            <i class="fa-solid fa-crown"></i>
-          </div>
-          <div>
-            <h2 class="text-xl font-black text-cyberYellow tracking-wide">數學校園車神殿堂</h2>
-            <p class="text-xs text-slate-400">Google Sheets 實時連線版</p>
-          </div>
-        </div>
-
-        <!-- Filter & Close -->
-        <div class="flex items-center space-x-3">
-          <select id="classFilterSelect" class="bg-slate-800 border border-slate-700 text-xs text-cyberBlue rounded-lg px-3 py-1.5 focus:outline-none focus:border-cyberBlue">
-            <option value="ALL">全部班別 (All Classes)</option>
-          </select>
-          <button id="btnCloseRank" class="text-slate-400 hover:text-white text-2xl transition"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-      </div>
-
-      <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
-        
-        <!-- TOP 3 PODIUM SECTION (車神前三名頒獎台) -->
-        <div id="podiumContainer" class="grid grid-cols-3 gap-2 sm:gap-4 items-end pt-2 pb-4 border-b border-slate-800">
-          <!-- 2nd Place -->
-          <div class="bg-gradient-to-t from-slate-900 to-slate-800/80 border border-slate-400/40 rounded-xl p-3 text-center flex flex-col items-center">
-            <div class="w-8 h-8 rounded-full bg-slate-300 text-slate-900 font-black text-sm flex items-center justify-center mb-1 shadow">🥈</div>
-            <div class="text-xs text-slate-400 font-bold">亞軍車神</div>
-            <div id="podium2Name" class="text-sm font-black text-white truncate w-full mt-1">--</div>
-            <div id="podium2Class" class="text-[10px] text-cyberBlue">--</div>
-            <div id="podium2Score" class="text-base font-black text-cyberYellow mt-1">0</div>
-          </div>
-
-          <!-- 1st Place (Champion) -->
-          <div class="bg-gradient-to-t from-amber-950/60 via-slate-900 to-amber-900/40 border-2 border-cyberYellow rounded-xl p-4 text-center flex flex-col items-center -translate-y-2 shadow-xl neon-border-yellow">
-            <div class="w-10 h-10 rounded-full bg-cyberYellow text-black font-black text-lg flex items-center justify-center mb-1 shadow-lg animate-pulse">🥇</div>
-            <div class="text-xs text-cyberYellow font-black uppercase tracking-wider">最高車神</div>
-            <div id="podium1Name" class="text-base font-black text-white truncate w-full mt-1">--</div>
-            <div id="podium1Class" class="text-xs text-cyberBlue font-bold">--</div>
-            <div id="podium1Score" class="text-xl font-black text-cyberYellow mt-1 neon-text-yellow">0</div>
-          </div>
-
-          <!-- 3rd Place -->
-          <div class="bg-gradient-to-t from-slate-900 to-amber-900/20 border border-amber-700/40 rounded-xl p-3 text-center flex flex-col items-center">
-            <div class="w-8 h-8 rounded-full bg-amber-700 text-amber-100 font-black text-sm flex items-center justify-center mb-1 shadow">🥉</div>
-            <div class="text-xs text-slate-400 font-bold">季軍車神</div>
-            <div id="podium3Name" class="text-sm font-black text-white truncate w-full mt-1">--</div>
-            <div id="podium3Class" class="text-[10px] text-cyberBlue">--</div>
-            <div id="podium3Score" class="text-base font-black text-cyberYellow mt-1">0</div>
-          </div>
-        </div>
-
-        <!-- FULL RANKING TABLE -->
-        <div>
-          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>車神英雄榜單</span>
-            <span id="recordCountText" class="text-cyberBlue text-[11px]">載入中...</span>
-          </h3>
-          <table class="w-full text-left text-sm text-slate-300">
-            <thead class="text-xs uppercase bg-slate-900 text-cyberBlue border-b border-slate-800">
-              <tr>
-                <th class="py-2.5 px-3">排名</th>
-                <th class="py-2.5 px-3">賽手姓名</th>
-                <th class="py-2.5 px-3">班別</th>
-                <th class="py-2.5 px-3 text-right">得分</th>
-                <th class="py-2.5 px-3 text-right">日期</th>
-              </tr>
-            </thead>
-            <tbody id="leaderboardBody" class="divide-y divide-slate-800/80">
-              <tr><td colspan="5" class="text-center py-8 text-slate-500">正在讀取 Google Sheets 車神資料...</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- CAMERA SETUP MODAL -->
-  <div id="cameraModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur flex items-center justify-center p-4">
-    <div class="bg-cyberCard border-2 border-cyberBlue/60 rounded-2xl w-full max-w-md p-6 text-center space-y-4">
-      <h3 class="text-xl font-bold text-white flex items-center justify-center space-x-2">
-        <i class="fa-solid fa-sliders text-cyberBlue"></i>
-        <span>體感與鏡頭設置</span>
-      </h3>
-      <p class="text-xs text-slate-300">將 iPad 或電腦鏡頭對準頭部，向左或向右傾斜頭部即可變換車道。</p>
-
-      <div class="space-y-3 text-left bg-slate-900 p-4 rounded-xl border border-slate-800">
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-400">體感靈敏度 (Sensitivity)</span>
-            <span id="sensVal" class="text-cyberBlue font-bold">Medium</span>
-          </div>
-          <input type="range" id="sensSlider" min="10" max="35" value="20" class="w-full accent-cyberBlue">
-        </div>
-      </div>
-
-      <button id="btnCloseCamera" class="w-full py-2.5 rounded-xl bg-cyberBlue text-black font-bold hover:opacity-90">
-        完成設置並返回
-      </button>
-    </div>
-  </div>
-
-  <!-- GOOGLE SHEETS API CONNECTOR SCRIPT -->
-  <script>
-    // 🔗 已成功連接你發布的 Google Apps Script Web App 網址
-    const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbx0W-bfZwnHUbcuicaxQq8OsSLKCPzkS21pVG3vg2lxAA0cq7tzDt0IhxnHSCUIzecqgA/exec";
-
-    // 1. 上傳成績至 Google Sheets
-    window.saveLeaderboardRecord = async function(record) {
-      try {
-        await fetch(GOOGLE_SHEETS_API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: record.name,
-            className: record.className.toUpperCase(),
-            score: record.score,
-            date: record.date
-          })
-        });
-        console.log("成績已成功傳送至 Google Sheets！");
-      } catch (e) {
-        console.error("無法上傳成績至 Google Sheets:", e);
-      }
-    };
-
-    // 2. 從 Google Sheets 讀取即時排行榜
-    window.listenToLeaderboard = async function(callback) {
-      try {
-        const res = await fetch(GOOGLE_SHEETS_API_URL);
-        const data = await res.json();
-        callback(data);
-      } catch (e) {
-        console.error("無法讀取 Google Sheets 排行榜數據:", e);
-      }
-    };
-  </script>
-
-  <!-- GAME CORE SCRIPT -->
-  <script>
-    class SoundFX {
-      constructor() { this.ctx = null; }
-      init() {
-        if (!this.ctx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          this.ctx = new AudioContext();
+    <script>
+        // 1. 自動偵測是否處於 Google Sites 或其他 iframe 內
+        if (window.self !== window.top) {
+            document.getElementById('iframe-warning').style.display = 'block';
         }
-      }
-      playCorrect() {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(523.25, now);
-        osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
-      }
-      playWrong() {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(180, now);
-        osc.frequency.linearRampToValueAtTime(80, now + 0.4);
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.4);
-      }
-      playEngine() {
-        if (!this.ctx) return;
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(120, now);
-        gain.gain.setValueAtTime(0.04, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.1);
-      }
-    }
 
-    const sound = new SoundFX();
+        // 2. Google Sheets API 網址設定
+        const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbx0W-bfZwnHUbcuicaxQq8OsSLKCPzkS21pVG3vg2lxAA0cq7tzDt0IhxnHSCUIzecqgA/exec";
 
-    const MATH_BENCHMARKS = [
-      { frac: "1/2", dec: "0.5", pct: "50%" },
-      { frac: "1/4", dec: "0.25", pct: "25%" },
-      { frac: "3/4", dec: "0.75", pct: "75%" },
-      { frac: "1/5", dec: "0.2", pct: "20%" },
-      { frac: "2/5", dec: "0.4", pct: "40%" },
-      { frac: "3/5", dec: "0.6", pct: "60%" },
-      { frac: "4/5", dec: "0.8", pct: "80%" },
-      { frac: "1/8", dec: "0.125", pct: "12.5%" },
-      { frac: "3/8", dec: "0.375", pct: "37.5%" },
-      { frac: "5/8", dec: "0.625", pct: "62.5%" },
-      { frac: "7/8", dec: "0.875", pct: "87.5%" }
-    ];
-
-    function generateQuestion() {
-      const target = MATH_BENCHMARKS[Math.floor(Math.random() * MATH_BENCHMARKS.length)];
-      const mode = Math.floor(Math.random() * 3);
-      
-      let qText = "";
-      let correctAnswer = "";
-      let answerType = "dec";
-
-      if (mode === 0) {
-        qText = `請問 ${target.frac} 等於哪個「小數」?`;
-        correctAnswer = target.dec;
-        answerType = "dec";
-      } else if (mode === 1) {
-        qText = `請問 ${target.dec} 等於哪個「分數」?`;
-        correctAnswer = target.frac;
-        answerType = "frac";
-      } else {
-        qText = `請問 ${target.frac} 等於哪個「百分數」?`;
-        correctAnswer = target.pct;
-        answerType = "pct";
-      }
-
-      const wrongPool = MATH_BENCHMARKS
-        .filter(item => item[answerType] !== correctAnswer)
-        .map(item => item[answerType]);
-      
-      wrongPool.sort(() => Math.random() - 0.5);
-      const options = [correctAnswer, wrongPool[0], wrongPool[1]];
-      options.sort(() => Math.random() - 0.5);
-
-      const correctLane = options.indexOf(correctAnswer);
-
-      return { questionText: qText, options, correctLane, correctAnswer };
-    }
-
-    const canvas = document.getElementById('raceCanvas');
-    const ctx = canvas.getContext('2d');
-
-    function resizeCanvas() {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    let player = { name: "", className: "", score: 0, hp: 3, currentLane: 1, targetLane: 1, xPos: 1 };
-    let currentQuestion = null;
-    let targetY = 0;
-    let gameSpeed = 3.5;
-    let isPlaying = false;
-    let sensitivityThreshold = 20;
-
-    const videoEl = document.getElementById('webcamVideo');
-    const poseCanvas = document.getElementById('poseCanvas');
-    const poseCtx = poseCanvas.getContext('2d');
-    const headDirectionText = document.getElementById('headDirectionText');
-    let detector = null;
-
-    async function initCameraAndPose() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 320, height: 240, facingMode: 'user' },
-          audio: false
-        });
-        videoEl.srcObject = stream;
-        videoEl.onloadedmetadata = async () => {
-          poseCanvas.width = videoEl.videoWidth;
-          poseCanvas.height = videoEl.videoHeight;
-          try {
-            document.getElementById('poseStatus').innerText = "載入AI";
-            const model = poseDetection.SupportedModels.MoveNet;
-            detector = await poseDetection.createDetector(model);
-            document.getElementById('poseStatus').innerText = "AI就緒";
-          } catch (err) {
-            document.getElementById('poseStatus').innerText = "普通追蹤";
-          }
-          detectPoseLoop();
-        };
-      } catch (err) {
-        document.getElementById('poseStatus').innerText = "觸控模式";
-      }
-    }
-
-    async function detectPoseLoop() {
-      poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
-
-      if (detector && videoEl.readyState >= 2) {
-        try {
-          const poses = await detector.estimatePoses(videoEl);
-          if (poses.length > 0 && poses[0].keypoints) {
-            const nose = poses[0].keypoints.find(k => k.name === 'nose');
-            if (nose && nose.score > 0.3) {
-              poseCtx.fillStyle = '#00f0ff';
-              poseCtx.beginPath();
-              poseCtx.arc(nose.x, nose.y, 6, 0, Math.PI * 2);
-              poseCtx.fill();
-
-              const centerX = poseCanvas.width / 2;
-              const diffX = nose.x - centerX;
-
-              // Correct steering logic for mirrored video
-              if (diffX > sensitivityThreshold) {
-                setPlayerLane(0); // Left Lane
-                headDirectionText.innerText = "LEFT (向左傾)";
-                headDirectionText.className = "text-xs font-black text-cyberBlue";
-              } else if (diffX < -sensitivityThreshold) {
-                setPlayerLane(2); // Right Lane
-                headDirectionText.innerText = "RIGHT (向右傾)";
-                headDirectionText.className = "text-xs font-black text-cyberPink";
-              } else {
-                setPlayerLane(1); // Center Lane
-                headDirectionText.innerText = "CENTER (置中)";
-                headDirectionText.className = "text-xs font-black text-cyberYellow";
-              }
+        // 初始化攝影機
+        async function setupCamera() {
+            const video = document.getElementById('webcam');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 320, height: 240, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        resolve(video);
+                    };
+                });
+            } catch (err) {
+                console.error("無法讀取攝影機: ", err);
             }
-          }
-        } catch (e) {}
-      }
-      requestAnimationFrame(detectPoseLoop);
-    }
-
-    function setPlayerLane(lane) { player.targetLane = lane; }
-
-    let frameCount = 0;
-
-    function renderGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      player.xPos += (player.targetLane - player.xPos) * 0.2;
-
-      const horizonY = canvas.height * 0.35;
-      const skyGradient = ctx.createLinearGradient(0, 0, 0, horizonY);
-      skyGradient.addColorStop(0, '#0b0f19');
-      skyGradient.addColorStop(1, '#1e1035');
-      ctx.fillStyle = skyGradient;
-      ctx.fillRect(0, 0, canvas.width, horizonY);
-
-      ctx.fillStyle = '#ff007f';
-      ctx.beginPath();
-      ctx.arc(canvas.width / 2, horizonY, 40, Math.PI, 0);
-      ctx.fill();
-
-      const roadTopW = canvas.width * 0.15;
-      const roadBotW = canvas.width * 0.85;
-      const roadTopX = (canvas.width - roadTopW) / 2;
-      const roadBotX = (canvas.width - roadBotW) / 2;
-
-      ctx.fillStyle = '#111827';
-      ctx.beginPath();
-      ctx.moveTo(roadTopX, horizonY);
-      ctx.lineTo(roadTopX + roadTopW, horizonY);
-      ctx.lineTo(roadBotX + roadBotW, canvas.height);
-      ctx.lineTo(roadBotX, canvas.height);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      frameCount += gameSpeed;
-      ctx.strokeStyle = '#ffe600';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([15, 15]);
-
-      for (let i = 1; i <= 2; i++) {
-        const topLx = roadTopX + (roadTopW / 3) * i;
-        const botLx = roadBotX + (roadBotW / 3) * i;
-        ctx.beginPath();
-        ctx.moveTo(topLx, horizonY);
-        ctx.lineTo(botLx, canvas.height);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-
-      if (isPlaying && currentQuestion) {
-        targetY += gameSpeed;
-        const progress = (targetY - horizonY) / (canvas.height - horizonY);
-
-        if (progress >= 0 && progress <= 1) {
-          const currentRoadW = roadTopW + (roadBotW - roadTopW) * progress;
-          const currentRoadX = roadTopX + (roadBotX - roadTopX) * progress;
-          const laneWidth = currentRoadW / 3;
-
-          for (let l = 0; l < 3; l++) {
-            const boxCenterX = currentRoadX + laneWidth * l + laneWidth / 2;
-            const boxY = horizonY + (canvas.height - horizonY) * progress;
-            const boxSize = 25 + progress * 40;
-
-            ctx.fillStyle = l === player.targetLane ? 'rgba(0, 240, 255, 0.9)' : 'rgba(22, 30, 49, 0.95)';
-            ctx.strokeStyle = l === player.targetLane ? '#ffe600' : '#ff007f';
-            ctx.lineWidth = 2 + progress * 3;
-
-            ctx.beginPath();
-            ctx.roundRect(boxCenterX - boxSize, boxY - boxSize / 1.5, boxSize * 2, boxSize, 8);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${Math.max(12, Math.floor(boxSize * 0.45))}px Inter, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(currentQuestion.options[l], boxCenterX, boxY);
-          }
         }
 
-        if (targetY >= canvas.height - 70) checkAnswerCollision();
-      }
-
-      const carProgress = 0.88;
-      const carRoadW = roadTopW + (roadBotW - roadTopW) * carProgress;
-      const carRoadX = roadTopX + (roadBotX - roadTopX) * carProgress;
-      const carLaneW = carRoadW / 3;
-      const playerX = carRoadX + carLaneW * player.xPos + carLaneW / 2;
-      const playerY = horizonY + (canvas.height - horizonY) * carProgress;
-
-      ctx.fillStyle = '#ff007f';
-      ctx.beginPath();
-      ctx.roundRect(playerX - 28, playerY - 20, 56, 40, 10);
-      ctx.fill();
-
-      ctx.fillStyle = '#00f0ff';
-      ctx.beginPath();
-      ctx.roundRect(playerX - 18, playerY - 12, 36, 20, 5);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffe600';
-      ctx.fillRect(playerX - 22, playerY - 22, 10, 4);
-      ctx.fillRect(playerX + 12, playerY - 22, 10, 4);
-
-      if (isPlaying && Math.random() < 0.1) sound.playEngine();
-
-      requestAnimationFrame(renderGame);
-    }
-
-    function checkAnswerCollision() {
-      const chosenLane = Math.round(player.xPos);
-
-      if (chosenLane === currentQuestion.correctLane) {
-        sound.playCorrect();
-        player.score += 100;
-        document.getElementById('hudScore').innerText = player.score;
-        showFloatingFeedback("正確！ +100", "text-cyberBlue");
-      } else {
-        sound.playWrong();
-        player.hp -= 1;
-        updateHPDisplay();
-        showFloatingFeedback(`錯誤！正確是 ${currentQuestion.correctAnswer}`, "text-cyberPink");
-
-        if (player.hp <= 0) {
-          endGame();
-          return;
-        }
-      }
-
-      targetY = canvas.height * 0.35;
-      currentQuestion = generateQuestion();
-      document.getElementById('questionText').innerText = currentQuestion.questionText;
-    }
-
-    function showFloatingFeedback(msg, colorClass) {
-      const qBox = document.getElementById('questionText');
-      qBox.innerHTML = `<span class="${colorClass} animate-pulse">${msg}</span>`;
-      setTimeout(() => {
-        if (isPlaying && currentQuestion) {
-          qBox.innerText = currentQuestion.questionText;
-        }
-      }, 1000);
-    }
-
-    function updateHPDisplay() {
-      let hpStr = "";
-      for (let i = 0; i < player.hp; i++) hpStr += "❤️";
-      document.getElementById('hudHP').innerText = hpStr || "☠️ 淘汰";
-    }
-
-    function startGame() {
-      player.score = 0;
-      player.hp = 3;
-      player.targetLane = 1;
-      player.xPos = 1;
-      gameSpeed = 3.5;
-      isPlaying = true;
-
-      document.getElementById('hudScore').innerText = "0";
-      updateHPDisplay();
-      document.getElementById('startModal').classList.add('hidden');
-      document.getElementById('gameOverModal').classList.add('hidden');
-
-      sound.init();
-
-      targetY = canvas.height * 0.35;
-      currentQuestion = generateQuestion();
-      document.getElementById('questionText').innerText = currentQuestion.questionText;
-    }
-
-    function endGame() {
-      isPlaying = false;
-      document.getElementById('resName').innerText = player.name;
-      document.getElementById('resClass').innerText = player.className;
-      document.getElementById('resScore').innerText = player.score;
-
-      const dateStr = new Date().toLocaleDateString('zh-HK');
-      document.getElementById('resDate').innerText = dateStr;
-
-      document.getElementById('gameOverModal').classList.remove('hidden');
-
-      if (window.saveLeaderboardRecord) {
-        window.saveLeaderboardRecord({
-          name: player.name,
-          className: player.className,
-          score: player.score,
-          date: dateStr
+        window.addEventListener('load', async () => {
+            await setupCamera();
         });
-      }
-    }
-
-    document.getElementById('studentForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      player.name = document.getElementById('studentName').value.trim();
-      player.className = document.getElementById('studentClass').value.trim().toUpperCase();
-
-      document.getElementById('hudPlayer').innerText = player.name;
-      document.getElementById('hudClass').innerText = player.className;
-
-      startGame();
-    });
-
-    document.getElementById('btnLeft').addEventListener('click', () => setPlayerLane(0));
-    document.getElementById('btnCenter').addEventListener('click', () => setPlayerLane(1));
-    document.getElementById('btnRight').addEventListener('click', () => setPlayerLane(2));
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') setPlayerLane(0);
-      if (e.key === 'ArrowDown' || e.key === ' ') setPlayerLane(1);
-      if (e.key === 'ArrowRight') setPlayerLane(2);
-    });
-
-    // Upgraded Leaderboard UI Render Logic
-    let currentRawLeaderboard = [];
-
-    function updatePodiumAndTable(filteredList) {
-      // 1. Fill Podium (Top 3)
-      const p1 = filteredList[0] || { name: '--', className: '--', score: 0 };
-      const p2 = filteredList[1] || { name: '--', className: '--', score: 0 };
-      const p3 = filteredList[2] || { name: '--', className: '--', score: 0 };
-
-      document.getElementById('podium1Name').innerText = p1.name;
-      document.getElementById('podium1Class').innerText = p1.className;
-      document.getElementById('podium1Score').innerText = p1.score;
-
-      document.getElementById('podium2Name').innerText = p2.name;
-      document.getElementById('podium2Class').innerText = p2.className;
-      document.getElementById('podium2Score').innerText = p2.score;
-
-      document.getElementById('podium3Name').innerText = p3.name;
-      document.getElementById('podium3Class').innerText = p3.className;
-      document.getElementById('podium3Score').innerText = p3.score;
-
-      // 2. Render Full Table
-      const tbody = document.getElementById('leaderboardBody');
-      document.getElementById('recordCountText').innerText = `共 ${filteredList.length} 筆記錄`;
-
-      if (filteredList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500">目前尚無車神挑戰數據</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = filteredList.map((row, index) => `
-        <tr class="hover:bg-slate-800/50 transition">
-          <td class="py-2.5 px-3 font-bold ${index === 0 ? 'text-cyberYellow' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-amber-600' : 'text-slate-400'}">
-            ${index === 0 ? '🥇 1' : index === 1 ? '🥈 2' : index === 2 ? '🥉 3' : index + 1}
-          </td>
-          <td class="py-2.5 px-3 font-semibold text-white">${row.name || '匿名車神'}</td>
-          <td class="py-2.5 px-3 text-cyberBlue font-bold">${row.className || '--'}</td>
-          <td class="py-2.5 px-3 text-right font-bold text-cyberYellow">${row.score}</td>
-          <td class="py-2.5 px-3 text-right text-xs text-slate-400">${row.date || '--'}</td>
-        </tr>
-      `).join('');
-    }
-
-    function processLeaderboardData(data) {
-      currentRawLeaderboard = Array.isArray(data) ? data : [];
-
-      // Dynamically populate Class Filter Dropdown
-      const classSelect = document.getElementById('classFilterSelect');
-      const currentSelected = classSelect.value;
-
-      const classList = Array.from(new Set(currentRawLeaderboard.map(item => item.className).filter(Boolean))).sort();
-      
-      classSelect.innerHTML = `<option value="ALL">全部班別 (All Classes)</option>` + 
-        classList.map(c => `<option value="${c}">${c} 班</option>`).join('');
-
-      if (classList.includes(currentSelected)) {
-        classSelect.value = currentSelected;
-      }
-
-      filterLeaderboard();
-    }
-
-    function filterLeaderboard() {
-      const selectedClass = document.getElementById('classFilterSelect').value;
-      let filtered = currentRawLeaderboard;
-
-      if (selectedClass !== 'ALL') {
-        filtered = currentRawLeaderboard.filter(item => item.className === selectedClass);
-      }
-
-      updatePodiumAndTable(filtered);
-    }
-
-    document.getElementById('classFilterSelect').addEventListener('change', filterLeaderboard);
-
-    // Modal Triggers
-    document.getElementById('btnLeaderboard').addEventListener('click', () => {
-      document.getElementById('leaderboardModal').classList.remove('hidden');
-      if (window.listenToLeaderboard) window.listenToLeaderboard(processLeaderboardData);
-    });
-
-    document.getElementById('btnViewRank').addEventListener('click', () => {
-      document.getElementById('gameOverModal').classList.add('hidden');
-      document.getElementById('leaderboardModal').classList.remove('hidden');
-      if (window.listenToLeaderboard) window.listenToLeaderboard(processLeaderboardData);
-    });
-
-    document.getElementById('btnCloseRank').addEventListener('click', () => {
-      document.getElementById('leaderboardModal').classList.add('hidden');
-    });
-
-    // Sensitivity Trigger
-    document.getElementById('btnCameraSetup').addEventListener('click', () => {
-      document.getElementById('cameraModal').classList.remove('hidden');
-    });
-    document.getElementById('btnCloseCamera').addEventListener('click', () => {
-      document.getElementById('cameraModal').classList.add('hidden');
-    });
-    document.getElementById('sensSlider').addEventListener('input', (e) => {
-      sensitivityThreshold = parseInt(e.target.value);
-      document.getElementById('sensVal').innerText = sensitivityThreshold < 15 ? "High (敏感)" : sensitivityThreshold > 25 ? "Low (穩定)" : "Medium";
-    });
-
-    document.getElementById('btnRestart').addEventListener('click', startGame);
-
-    window.onload = function() {
-      resizeCanvas();
-      renderGame();
-      initCameraAndPose();
-    };
-  </script>
+    </script>
 </body>
 </html>
