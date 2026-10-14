@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>數學校園體感賽車</title>
-    <!-- MediaPipe & TensorFlow.js libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <!-- 引入穩定的 TF.js 與 Pose-Detection 函式庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@3.18.0/dist/tf-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@3.18.0/dist/tf-converter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@3.18.0/dist/tf-backend-webgl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0/dist/pose-detection.min.js"></script>
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             padding: 0;
             background-color: #1a1a2e;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
             color: white;
             display: flex;
             flex-direction: column;
@@ -24,36 +25,26 @@
             overflow: hidden;
         }
 
-        /* Google Sites 嵌入提示列 */
         #iframe-warning {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            background: linear-gradient(90deg, #ff416c, #ff4b2b);
+            background: #ff4757;
             color: white;
             text-align: center;
-            padding: 12px 10px;
-            font-size: 16px;
+            padding: 10px;
             font-weight: bold;
             z-index: 9999;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-
         #iframe-warning a {
-            background-color: #ffffff;
-            color: #ff416c;
-            padding: 6px 16px;
-            margin-left: 12px;
-            border-radius: 20px;
+            color: #1e90ff;
+            background: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            margin-left: 10px;
             text-decoration: none;
-            display: inline-block;
-            transition: transform 0.2s;
-        }
-
-        #iframe-warning a:hover {
-            transform: scale(1.05);
         }
 
         #game-container {
@@ -64,7 +55,6 @@
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             overflow: hidden;
-            margin-top: 20px;
         }
 
         canvas {
@@ -73,7 +63,6 @@
             display: block;
         }
 
-        /* 鏡頭視窗 */
         #webcam-container {
             position: absolute;
             top: 15px;
@@ -82,22 +71,32 @@
             height: 120px;
             border-radius: 8px;
             overflow: hidden;
-            border: 2px solid #e94560;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border: 2px solid #ff4757;
             background: #000;
+            z-index: 10;
         }
 
         #webcam {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* 鏡像翻轉 */
+            transform: scaleX(-1);
+        }
+
+        #status-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #eccc68;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-    <!-- 專為 Google Sites 內嵌設計的警告跳轉條 -->
     <div id="iframe-warning">
         ⚠️ 體感鏡頭需要獨立頁面權限！
         <a href="https://acmh-debug.github.io/math-racing-game/" target="_blank">點此開啟全螢幕體感模式 🚀</a>
@@ -106,42 +105,104 @@
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="webcam-container">
-            <!-- 加入 playsinline, autoplay, muted 確保 iOS / iPad 相容 -->
             <video id="webcam" autoplay playsinline muted></video>
         </div>
+        <div id="status-text">載入AI體感模型中，請稍候...</div>
     </div>
 
     <script>
-        // 1. 自動偵測是否處於 Google Sites 或其他 iframe 內
         if (window.self !== window.top) {
             document.getElementById('iframe-warning').style.display = 'block';
         }
 
-        // 2. Google Sheets API 網址設定
-        const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbx0W-bfZwnHUbcuicaxQq8OsSLKCPzkS21pVG3vg2lxAA0cq7tzDt0IhxnHSCUIzecqgA/exec";
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusText = document.getElementById('status-text');
 
-        // 初始化攝影機
+        let detector;
+        let video;
+
+        // 畫畫測試圖案（驗證 Canvas 運作）
+        function renderBackground() {
+            ctx.fillStyle = "#0f3460";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 畫出跑道測試線
+            ctx.strokeStyle = "#eccc68";
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(200, 0); ctx.lineTo(200, 600);
+            ctx.moveTo(600, 0); ctx.lineTo(600, 600);
+            ctx.stroke();
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "30px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("賽車準備中...", 400, 300);
+        }
+
         async function setupCamera() {
-            const video = document.getElementById('webcam');
+            video = document.getElementById('webcam');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 320, height: 240, facingMode: 'user' },
+                audio: false
+            });
+            video.srcObject = stream;
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resolve(video);
+                };
+            });
+        }
+
+        async function initAI() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 320, height: 240, facingMode: 'user' },
-                    audio: false
-                });
-                video.srcObject = stream;
-                return new Promise((resolve) => {
-                    video.onloadedmetadata = () => {
-                        resolve(video);
-                    };
-                });
+                renderBackground();
+                await setupCamera();
+                
+                // 初始化 MoveNet AI 模型
+                const detectorConfig = { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING };
+                detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig);
+                
+                statusText.style.display = "none";
+                detectPose();
             } catch (err) {
-                console.error("無法讀取攝影機: ", err);
+                console.error(err);
+                statusText.innerText = "載入失敗，請重新整理頁面！";
+                statusText.style.color = "#ff4757";
             }
         }
 
-        window.addEventListener('load', async () => {
-            await setupCamera();
-        });
+        async function detectPose() {
+            if (detector && video) {
+                const poses = await detector.estimatePoses(video);
+                
+                // 清空並重繪畫面
+                renderBackground();
+
+                if (poses.length > 0) {
+                    const nose = poses[0].keypoints.find(k => k.name === 'nose');
+                    if (nose && nose.score > 0.3) {
+                        // 畫出頭部追蹤紅點 (因鏡像要反轉 X)
+                        const targetX = 800 - (nose.x * (800 / video.videoWidth));
+                        const targetY = nose.y * (600 / video.videoHeight);
+
+                        ctx.fillStyle = "#ff4757";
+                        ctx.beginPath();
+                        ctx.arc(targetX, targetY, 20, 0, 2 * Math.PI);
+                        ctx.fill();
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "20px Arial";
+                        ctx.fillText("頭部已鎖定！頭部左右移動即可控制", 400, 100);
+                    }
+                }
+            }
+            requestAnimationFrame(detectPose);
+        }
+
+        window.addEventListener('load', initAI);
     </script>
 </body>
 </html>
