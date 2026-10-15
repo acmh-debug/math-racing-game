@@ -87,7 +87,7 @@
         <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
             <h1 style="font-size: 30px; margin-bottom: 5px; color: #eccc68;">🏎️ 小六分數小數互化體感賽車</h1>
-            <p style="color: #a4b0be; margin-bottom: 15px;">分母 2, 4, 5, 8 專題練習｜iPad 體感與音效版</p>
+            <p style="color: #a4b0be; margin-bottom: 15px;">分母 2, 4, 5, 8 專題練習｜校準啟動 & 錯題補答版</p>
             
             <div class="form-group">
                 <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 120px;">
@@ -140,22 +140,21 @@
         const ctx = canvas.getContext('2d');
         let model = null, video = null;
 
-        // 學生資料與選擇設定
         let studentInfo = { name: "", class: "", date: "" };
         let selectedCarColor = "#ff4757";
         let selectedCarStyle = "classic";
 
-        let score = 0, timeLeft = 60, gameActive = false;
+        let score = 0, timeLeft = 60, gameActive = false, isCalibrated = false;
         let currentLane = 1;
         const laneXPositions = [133, 400, 666];
 
         let currentProblem = { question: "", options: [], correctLane: 1 };
         let obstacleY = -50, obstacleSpeed = 3.2;
-        let statusMsg = "AI 體感載入中...";
+        let statusMsg = "請面向鏡頭正中間進行校準...";
         let baseCenterX = null;
         const sensitivityThreshold = 18;
 
-        // 🔊 原生 Web Audio API 音效生成器 (iPad 免外部檔案發聲)
+        // 音效系統
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -167,31 +166,36 @@
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
-
             const now = audioCtx.currentTime;
 
-            if (type === 'correct') { // 答對音效
+            if (type === 'correct') {
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, now); // C5
-                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.2); // C6
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.2);
                 gain.gain.setValueAtTime(0.3, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
                 osc.start(now); osc.stop(now + 0.2);
-            } else if (type === 'wrong') { // 答錯音效
+            } else if (type === 'wrong') {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(180, now);
                 osc.frequency.linearRampToValueAtTime(110, now + 0.25);
                 gain.gain.setValueAtTime(0.3, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
                 osc.start(now); osc.stop(now + 0.25);
-            } else if (type === 'engine') { // 引擎發動音效
+            } else if (type === 'engine') {
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(100, now);
                 osc.frequency.exponentialRampToValueAtTime(300, now + 0.4);
                 gain.gain.setValueAtTime(0.4, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
                 osc.start(now); osc.stop(now + 0.4);
-            } else if (type === 'finish') { // 結束歡呼聲
+            } else if (type === 'calibrate') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'finish') {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(440, now);
                 osc.frequency.setValueAtTime(554.37, now + 0.1);
@@ -203,7 +207,6 @@
             }
         }
 
-        // 小六常用分數 (分母 2, 4, 5, 8) 與對應小數庫
         const fractionData = [
             { frac: "1/2", dec: "0.5" },
             { frac: "1/4", dec: "0.25" }, { frac: "3/4", dec: "0.75" },
@@ -215,7 +218,8 @@
 
         function recalibrateCenter() {
             baseCenterX = null;
-            statusMsg = "🎯 已重新校準頭部正中心！";
+            isCalibrated = false;
+            statusMsg = "🎯 正在重新校準正中心...";
         }
 
         function generateProblem() {
@@ -251,7 +255,7 @@
         }
 
         async function startGame() {
-            initAudio(); // 初始化 iPad 音效
+            initAudio();
 
             const nameInput = document.getElementById('student-name').value.trim();
             const classInput = document.getElementById('student-class').value.trim();
@@ -273,21 +277,10 @@
             playSound('engine');
             document.getElementById('start-overlay').style.display = 'none';
 
-            score = 0; timeLeft = 60;
+            score = 0; timeLeft = 60; isCalibrated = false;
             generateProblem();
-            gameActive = true;
 
             requestAnimationFrame(gameLoop);
-
-            const timer = setInterval(() => {
-                if (gameActive && timeLeft > 0) {
-                    timeLeft--;
-                } else if (timeLeft === 0) {
-                    gameActive = false;
-                    clearInterval(timer);
-                    endGame();
-                }
-            }, 1000);
 
             try {
                 video = document.getElementById('webcam');
@@ -300,17 +293,32 @@
 
                 statusMsg = "載入 AI 模型中...";
                 model = await blazeface.load();
-                statusMsg = "請保持頭部居中...";
+                statusMsg = "請保持頭部面向正中間進行校準...";
                 
                 detectPoseLoop();
             } catch (err) {
                 console.error(err);
                 statusMsg = "⚠️ 體感無效（可用鍵盤 ← → 操作）";
+                isCalibrated = true; // 備用模式免校準直接開始
+                startTimer();
                 window.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
                     if (e.key === 'ArrowRight') currentLane = Math.min(2, currentLane + 1);
                 });
             }
+        }
+
+        function startTimer() {
+            gameActive = true;
+            const timer = setInterval(() => {
+                if (gameActive && timeLeft > 0) {
+                    timeLeft--;
+                } else if (timeLeft === 0) {
+                    gameActive = false;
+                    clearInterval(timer);
+                    endGame();
+                }
+            }, 1000);
         }
 
         async function detectPoseLoop() {
@@ -323,7 +331,10 @@
 
                         if (baseCenterX === null) {
                             baseCenterX = currentX;
-                            statusMsg = "✅ 正中心校準完成！";
+                            playSound('calibrate');
+                            statusMsg = "✅ 校準成功！比賽開始！";
+                            isCalibrated = true;
+                            startTimer(); // 校準完成後才開始倒數計時與運算
                         }
 
                         const deltaX = currentX - baseCenterX;
@@ -334,55 +345,49 @@
                     }
                 } catch (e) { console.error(e); }
             }
-            if (gameActive) requestAnimationFrame(detectPoseLoop);
+            if (!gameActive || !isCalibrated) requestAnimationFrame(detectPoseLoop);
+            else requestAnimationFrame(detectPoseLoop);
         }
 
-        // 🎨 繪製立體跑車
         function drawCar(x, y, color, style) {
             ctx.save();
             ctx.translate(x, y);
 
-            // 車身陰影
             ctx.fillStyle = "rgba(0,0,0,0.3)";
             ctx.beginPath();
             ctx.ellipse(0, 15, 30, 45, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // 輪胎 (四個)
             ctx.fillStyle = "#111";
             ctx.fillRect(-28, -30, 8, 16);
             ctx.fillRect(20, -30, 8, 16);
             ctx.fillRect(-28, 15, 8, 18);
             ctx.fillRect(20, 15, 8, 18);
 
-            // 主車身
             ctx.fillStyle = color;
             ctx.beginPath();
             if (style === 'cyber') {
                 ctx.moveTo(0, -45); ctx.lineTo(24, -10); ctx.lineTo(20, 35); ctx.lineTo(-20, 35); ctx.lineTo(-24, -10);
             } else if (style === 'armored') {
                 ctx.moveTo(0, -35); ctx.lineTo(26, -20); ctx.lineTo(26, 35); ctx.lineTo(-26, 35); ctx.lineTo(-26, -20);
-            } else { // classic
+            } else {
                 ctx.moveTo(0, -40); ctx.lineTo(22, -15); ctx.lineTo(22, 35); ctx.lineTo(-22, 35); ctx.lineTo(-22, -15);
             }
             ctx.closePath();
             ctx.fill();
 
-            // 擋風玻璃 (車窗)
             ctx.fillStyle = "#111";
             ctx.beginPath();
             ctx.moveTo(-12, -10); ctx.lineTo(12, -10); ctx.lineTo(15, 5); ctx.lineTo(-15, 5);
             ctx.closePath();
             ctx.fill();
 
-            // 車頭燈 (亮黃燈)
             ctx.fillStyle = "#ffda79";
             ctx.beginPath();
             ctx.arc(-14, -35, 4, 0, Math.PI * 2);
             ctx.arc(14, -35, 4, 0, Math.PI * 2);
             ctx.fill();
 
-            // 尾翼
             ctx.fillStyle = "#222";
             ctx.fillRect(-22, 32, 44, 6);
 
@@ -393,13 +398,31 @@
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
 
-            // 跑道線
             ctx.strokeStyle = "#eccc68";
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(266, 0); ctx.lineTo(266, 600);
             ctx.moveTo(533, 0); ctx.lineTo(533, 600);
             ctx.stroke();
+
+            // 校準未完成前顯示等待動畫與提示
+            if (!isCalibrated) {
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillRect(0, 0, 800, 600);
+
+                ctx.fillStyle = "#eccc68";
+                ctx.font = "bold 32px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("🎯 正在校準頭部正中心...", 400, 260);
+                ctx.font = "20px Arial";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText("請面向螢幕正中間保持不動", 400, 310);
+
+                const carX = laneXPositions[currentLane];
+                drawCar(carX, 490, selectedCarColor, selectedCarStyle);
+                requestAnimationFrame(gameLoop);
+                return;
+            }
 
             if (gameActive) {
                 obstacleY += obstacleSpeed;
@@ -414,25 +437,25 @@
                     ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 34);
                 }
 
-                // 碰撞與計分判斷 + 音效發聲
+                // 碰撞與補答判定
                 if (obstacleY >= 450 && obstacleY <= 500) {
                     if (currentLane === currentProblem.correctLane) {
                         score += 10;
                         playSound('correct');
+                        generateProblem(); // 答對才產生下一題！
                     } else {
                         score = Math.max(0, score - 5);
                         playSound('wrong');
+                        obstacleY = -50; // 答錯不換題，方塊重置回頂端要求補答！
                     }
-                    generateProblem();
                 } else if (obstacleY > 600) {
-                    generateProblem();
+                    // 超過螢幕沒吃到也算未答對，重置回到頂端
+                    obstacleY = -50;
                 }
 
-                // 繪製自訂跑車
                 const carX = laneXPositions[currentLane];
                 drawCar(carX, 490, selectedCarColor, selectedCarStyle);
 
-                // UI 資訊
                 ctx.fillStyle = "#ffffff";
                 ctx.font = "bold 28px Arial";
                 ctx.textAlign = "center";
@@ -470,7 +493,7 @@
             let list = JSON.parse(localStorage.getItem('math_racing_leaderboard') || '[]');
             list.push(newEntry);
             list.sort((a, b) => b.score - a.score);
-            list = list.slice(0, 10); // 擴充保存 Top 10
+            list = list.slice(0, 10);
             localStorage.setItem('math_racing_leaderboard', JSON.stringify(list));
         }
 
