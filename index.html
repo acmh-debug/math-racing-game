@@ -28,7 +28,7 @@
         canvas { width: 100%; height: 100%; display: block; }
         #webcam-container {
             position: absolute; top: 15px; right: 15px;
-            width: 160px; height: 120px;
+            width: 140px; height: 105px;
             border-radius: 8px; overflow: hidden;
             border: 2px solid #ff4757; background: #000; z-index: 10;
         }
@@ -48,10 +48,70 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let model, video;
-        let debugMessage = "系統初始化中...";
 
-        function drawScene() {
-            // 背景
+        // 遊戲狀態變數
+        let score = 0;
+        let timeLeft = 60;
+        let gameActive = false;
+        let currentLane = 1; // 0: 左, 1: 中, 2: 右
+        let laneXPositions = [133, 400, 666]; // 跑道中心 X 座標
+
+        // 題目與障礙物狀態
+        let currentProblem = { question: "準備中...", options: [0, 0, 0], correctLane: 1 };
+        let obstacleY = -50;
+        let obstacleSpeed = 4;
+
+        // 產生隨機數學題目 (加減法)
+        function generateProblem() {
+            const a = Math.floor(Math.random() * 20) + 1;
+            const b = Math.floor(Math.random() * 20) + 1;
+            const isAddition = Math.random() > 0.5;
+            
+            const questionText = isAddition ? `${a} + ${b} = ?` : `${Math.max(a, b)} - ${Math.min(a, b)} = ?`;
+            const correctAnswer = isAddition ? a + b : Math.max(a, b) - Math.min(a, b);
+
+            const correctLane = Math.floor(Math.random() * 3);
+            const options = [0, 0, 0];
+
+            options[correctLane] = correctAnswer;
+            for (let i = 0; i < 3; i++) {
+                if (i !== correctLane) {
+                    let fakeAnswer;
+                    do {
+                        fakeAnswer = correctAnswer + (Math.floor(Math.random() * 10) - 5);
+                    } while (fakeAnswer === correctAnswer || fakeAnswer < 0 || options.includes(fakeAnswer));
+                    options[i] = fakeAnswer;
+                }
+            }
+
+            currentProblem = { question: questionText, options: options, correctLane: correctLane };
+            obstacleY = -50; // 重置障礙物位置
+        }
+
+        async function init() {
+            video = document.getElementById('webcam');
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 320, height: 240, facingMode: 'user' }, audio: false
+            });
+            video.srcObject = stream;
+            await new Promise(r => video.onloadedmetadata = r);
+            video.play();
+
+            model = await blazeface.load();
+
+            // 開始倒數計時
+            generateProblem();
+            gameActive = true;
+            setInterval(() => {
+                if (gameActive && timeLeft > 0) timeLeft--;
+                if (timeLeft === 0) gameActive = false;
+            }, 1000);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        async function gameLoop() {
+            // 1. 繪製跑道與背景
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
 
@@ -63,82 +123,84 @@
             ctx.moveTo(533, 0); ctx.lineTo(533, 600);
             ctx.stroke();
 
-            // 狀態文字
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "20px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(debugMessage, 400, 40);
-        }
+            // 2. 體感偵測頭部位置
+            if (model && video && video.readyState >= 2) {
+                const predictions = await model.estimateFaces(video, false, false, 0.3);
+                if (predictions.length > 0) {
+                    const face = predictions[0];
+                    const centerX = (face.topLeft[0] + face.bottomRight[0]) / 2;
+                    const targetX = 800 - (centerX * (800 / video.videoWidth));
 
-        async function init() {
-            drawScene();
-            
-            try {
-                video = document.getElementById('webcam');
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 320, height: 240, facingMode: 'user' },
-                    audio: false
-                });
-                video.srcObject = stream;
-                
-                await new Promise((resolve) => {
-                    video.onloadedmetadata = () => {
-                        video.play();
-                        resolve();
-                    };
-                });
-
-                debugMessage = "鏡頭已啟動，正在載入 BlazeFace 模型...";
-                model = await blazeface.load();
-                debugMessage = "模型載入完成！正在搜尋人臉...";
-                
-                requestAnimationFrame(detectLoop);
-            } catch (err) {
-                debugMessage = "⚠️ 發生錯誤: " + err.message;
-                drawScene();
-            }
-        }
-
-        async function detectLoop() {
-            if (model && video) {
-                try {
-                    // estimateFaces 回傳預測結果
-                    const predictions = await model.estimateFaces(video, false, false, 0.3);
-
-                    drawScene();
-
-                    if (predictions.length > 0) {
-                        const face = predictions[0];
-                        // 取得邊界框
-                        const start = face.topLeft;
-                        const end = face.bottomRight;
-
-                        // 計算中心點 (鏡像)
-                        const centerX = (start[0] + end[0]) / 2;
-                        const centerY = (start[1] + end[1]) / 2;
-
-                        const targetX = 800 - (centerX * (800 / video.videoWidth));
-                        const targetY = centerY * (600 / video.videoHeight);
-
-                        // 畫紅點
-                        ctx.fillStyle = "#ff4757";
-                        ctx.shadowColor = "#ff4757";
-                        ctx.shadowBlur = 15;
-                        ctx.beginPath();
-                        ctx.arc(targetX, targetY, 25, 0, 2 * Math.PI);
-                        ctx.fill();
-                        ctx.shadowBlur = 0;
-
-                        debugMessage = `✅ 已成功捕捉頭部！ (X: ${Math.round(targetX)}, Y: ${Math.round(targetY)})`;
-                    } else {
-                        debugMessage = "🔍 搜尋中：未在鏡頭中辨識到人臉，請面向光線充足處";
-                    }
-                } catch (e) {
-                    debugMessage = "偵測過程發生異常: " + e.message;
+                    // 依據頭部 X 位置判斷切換至哪條跑道
+                    if (targetX < 266) currentLane = 0; // 左跑道
+                    else if (targetX > 533) currentLane = 2; // 右跑道
+                    else currentLane = 1; // 中跑道
                 }
             }
 
-            requestAnimationFrame(detectLoop);
+            if (gameActive) {
+                // 3. 更新與繪製題目障礙物
+                obstacleY += obstacleSpeed;
+
+                for (let i = 0; i < 3; i++) {
+                    // 繪製選項方塊
+                    ctx.fillStyle = (i === currentProblem.correctLane) ? "#2ed573" : "#ff4757";
+                    ctx.fillRect(laneXPositions[i] - 50, obstacleY, 100, 50);
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "bold 24px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 33);
+                }
+
+                // 碰撞檢測 (賽車固定在 Y: 500 的位置)
+                if (obstacleY >= 460 && obstacleY <= 510) {
+                    if (currentLane === currentProblem.correctLane) {
+                        score += 10;
+                    } else {
+                        score = Math.max(0, score - 5);
+                    }
+                    generateProblem(); // 生成新題目
+                } else if (obstacleY > 600) {
+                    generateProblem(); // 超過畫面生成新題目
+                }
+
+                // 4. 繪製玩家賽車 (依照 currentLane 決定位置)
+                const carX = laneXPositions[currentLane];
+                ctx.fillStyle = "#eccc68";
+                ctx.shadowColor = "#eccc68";
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(carX, 500, 25, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // 5. 繪製 UI (題目、得分、時間)
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 28px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(`題目：${currentProblem.question}`, 400, 50);
+
+                ctx.font = "20px Arial";
+                ctx.textAlign = "left";
+                ctx.fillText(`得分: ${score}`, 30, 40);
+                ctx.fillText(`剩餘時間: ${timeLeft}s`, 30, 70);
+
+            } else {
+                // 6. 遊戲結束畫面
+                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                ctx.fillRect(0, 0, 800, 600);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 40px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("🎉 遊戲結束！", 400, 250);
+                ctx.fillText(`最終得分：${score} 分`, 400, 320);
+                ctx.font = "20px Arial";
+                ctx.fillText("重新整理頁面即可再次挑戰", 400, 380);
+            }
+
+            requestAnimationFrame(gameLoop);
         }
 
         window.addEventListener('load', init);
