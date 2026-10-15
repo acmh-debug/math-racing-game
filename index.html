@@ -48,74 +48,93 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let model, video;
+        let debugMessage = "系統初始化中...";
 
         function drawScene() {
+            // 背景
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
 
-            // 畫三線道分隔線
+            // 跑道線
             ctx.strokeStyle = "#eccc68";
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(266, 0); ctx.lineTo(266, 600);
             ctx.moveTo(533, 0); ctx.lineTo(533, 600);
             ctx.stroke();
+
+            // 狀態文字
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "20px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(debugMessage, 400, 40);
         }
 
         async function init() {
             drawScene();
             
-            video = document.getElementById('webcam');
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 320, height: 240, facingMode: 'user' },
-                audio: false
-            });
-            video.srcObject = stream;
-            await new Promise(r => video.onloadedmetadata = r);
-            video.play();
+            try {
+                video = document.getElementById('webcam');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 320, height: 240, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
 
-            model = await blazeface.load();
-            requestAnimationFrame(detectLoop);
+                debugMessage = "鏡頭已啟動，正在載入 BlazeFace 模型...";
+                model = await blazeface.load();
+                debugMessage = "模型載入完成！正在搜尋人臉...";
+                
+                requestAnimationFrame(detectLoop);
+            } catch (err) {
+                debugMessage = "⚠️ 發生錯誤: " + err.message;
+                drawScene();
+            }
         }
 
         async function detectLoop() {
-            drawScene();
+            if (model && video) {
+                try {
+                    // estimateFaces 回傳預測結果
+                    const predictions = await model.estimateFaces(video, false, false, 0.3);
 
-            if (model && video && video.readyState >= 2) {
-                const predictions = await model.estimateFaces(video, false);
+                    drawScene();
 
-                if (predictions.length > 0) {
-                    const face = predictions[0];
-                    const start = face.topLeft;
-                    const end = face.bottomRight;
+                    if (predictions.length > 0) {
+                        const face = predictions[0];
+                        // 取得邊界框
+                        const start = face.topLeft;
+                        const end = face.bottomRight;
 
-                    // 計算人臉的中心點坐標
-                    const centerX = start[0] + (end[0] - start[0]) / 2;
-                    const centerY = start[1] + (end[1] - start[1]) / 2;
+                        // 計算中心點 (鏡像)
+                        const centerX = (start[0] + end[0]) / 2;
+                        const centerY = (start[1] + end[1]) / 2;
 
-                    // 映射到 Canvas 畫布尺寸（並進行鏡像反轉）
-                    const targetX = 800 - (centerX * (800 / video.videoWidth));
-                    const targetY = centerY * (600 / video.videoHeight);
+                        const targetX = 800 - (centerX * (800 / video.videoWidth));
+                        const targetY = centerY * (600 / video.videoHeight);
 
-                    // 繪製控制賽車（亮紅色光圈圓點）
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = "#ff4757";
-                    ctx.fillStyle = "#ff4757";
-                    ctx.beginPath();
-                    ctx.arc(targetX, targetY, 25, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.shadowBlur = 0; // 還原發光
+                        // 畫紅點
+                        ctx.fillStyle = "#ff4757";
+                        ctx.shadowColor = "#ff4757";
+                        ctx.shadowBlur = 15;
+                        ctx.beginPath();
+                        ctx.arc(targetX, targetY, 25, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
 
-                    // 顯示成功提示文字
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = "22px Arial";
-                    ctx.textAlign = "center";
-                    ctx.fillText("🏎️ 體感控制中！請嘗試左右晃動身體", 400, 50);
-                } else {
-                    ctx.fillStyle = "#eccc68";
-                    ctx.font = "22px Arial";
-                    ctx.textAlign = "center";
-                    ctx.fillText("🔍 請面向鏡頭以啟用體感控制...", 400, 300);
+                        debugMessage = `✅ 已成功捕捉頭部！ (X: ${Math.round(targetX)}, Y: ${Math.round(targetY)})`;
+                    } else {
+                        debugMessage = "🔍 搜尋中：未在鏡頭中辨識到人臉，請面向光線充足處";
+                    }
+                } catch (e) {
+                    debugMessage = "偵測過程發生異常: " + e.message;
                 }
             }
 
