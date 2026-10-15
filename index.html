@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小六分數小數互化體感賽車 - 趣味車款與賽道美化版</title>
+    <title>小六分數小數互化體感賽車 - 精美車款版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
@@ -104,7 +104,7 @@
         <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
             <h1 style="font-size: 32px; margin-bottom: 5px; color: #66fcf1; text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);">🏎️ 小六分數小數互化體感賽車</h1>
-            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜趣味載具版</p>
+            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜超酷美化車款版</p>
             
             <div class="form-group">
                 <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 130px;">
@@ -114,13 +114,13 @@
             <div class="form-group">
                 <label style="align-self: center; font-weight: bold; color: #66fcf1;">載具款式：</label>
                 <select id="car-style">
-                    <option value="bus">🚌 黃色校車</option>
-                    <option value="rocket">🚀 太空火箭</option>
-                    <option value="police">🚓 酷炫警車</option>
-                    <option value="f1">🏎️ F1 極速賽車</option>
+                    <option value="bus">🚌 經典黃色校車</option>
+                    <option value="rocket">🚀 光速太空火箭</option>
+                    <option value="police">🚓 裝甲巡邏警車</option>
+                    <option value="f1">🏎️ F1 競速超跑</option>
                 </select>
 
-                <label style="align-self: center; font-weight: bold; color: #66fcf1; margin-left: 10px;">車身顏色：</label>
+                <label style="align-self: center; font-weight: bold; color: #66fcf1; margin-left: 10px;">塗裝顏色：</label>
                 <select id="car-color">
                     <option value="#f1c40f">💛 活力黃</option>
                     <option value="#ff4757">❤️ 經典紅</option>
@@ -411,13 +411,11 @@
             else requestAnimationFrame(detectPoseLoop);
         }
 
-        // 🎨 畫炫彩答案格與裝飾金幣/箭頭
         function drawOptionBlock(x, y, text) {
             const w = 140, h = 55, r = 12;
             ctx.save();
             ctx.translate(x - w / 2, y);
 
-            // 邊緣旋轉金幣飾品
             ctx.fillStyle = "#ffda79";
             ctx.beginPath();
             ctx.arc(-15, h / 2, 8, 0, Math.PI * 2);
@@ -459,106 +457,147 @@
             ctx.restore();
         }
 
-        // 🏎️/🚌/🚀/🚓 趣味主題載具繪製引擎
+        // 🏎️/🚌/🚀/🚓 升級版精美造型載具繪製引擎
         function drawVehicle(x, y, color, style) {
             ctx.save();
             ctx.translate(x, y);
 
             tickCount++;
 
-            // 陰影
-            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            // 1. 車底漸層懸浮陰影
+            ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
             ctx.beginPath();
-            ctx.ellipse(0, 15, 32, 48, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 18, 34, 50, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            if (style === 'bus') { // 🚌 黃色校車
-                ctx.fillStyle = color;
-                ctx.beginPath(); ctx.roundRect(-24, -45, 48, 85, 8); ctx.fill();
-
-                // 車頂與窗戶
+            if (style === 'bus') { // 🚌 經典黃色校車 (精細版)
+                // 輪胎
                 ctx.fillStyle = "#111";
-                ctx.fillRect(-20, -35, 40, 12); // 前擋風玻璃
-                ctx.fillRect(-20, -15, 3, 40);  // 側窗
-                ctx.fillRect(17, -15, 3, 40);
+                ctx.fillRect(-28, -30, 6, 18); ctx.fillRect(22, -30, 6, 18);
+                ctx.fillRect(-28, 15, 6, 20);  ctx.fillRect(22, 15, 6, 20);
 
-                // 校車黑條與標誌
-                ctx.fillStyle = "#000";
-                ctx.fillRect(-24, -5, 48, 6);
-                ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 10px Arial"; ctx.textAlign = "center";
-                ctx.fillText("SCHOOL BUS", 0, 0);
+                // 校車金屬主體 (兩側漸層光影)
+                const busGrad = ctx.createLinearGradient(-25, 0, 25, 0);
+                busGrad.addColorStop(0, "#d4ac0d");
+                busGrad.addColorStop(0.3, color);
+                busGrad.addColorStop(0.7, color);
+                busGrad.addColorStop(1, "#f39c12");
+                ctx.fillStyle = busGrad;
+                ctx.beginPath(); ctx.roundRect(-24, -45, 48, 85, 10); ctx.fill();
 
-                // 閃爍校車燈
-                ctx.fillStyle = (tickCount % 20 < 10) ? "#ff4757" : "#1e90ff";
-                ctx.beginPath();
-                ctx.arc(-16, -42, 4, 0, Math.PI * 2);
-                ctx.arc(16, -42, 4, 0, Math.PI * 2);
-                ctx.fill();
+                // 黑色飾條與警示字樣
+                ctx.fillStyle = "#111"; ctx.fillRect(-24, -12, 48, 6); ctx.fillRect(-24, 15, 48, 4);
+                ctx.fillStyle = "#ffffff"; ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
+                ctx.fillText("SCHOOL BUS", 0, -7);
 
-            } else if (style === 'rocket') { // 🚀 太空火箭
-                // 噴射火焰動畫
-                const fireH = Math.random() * 20 + 20;
+                // 黑色前/後擋風玻璃 + 亮面藍色反射光
+                ctx.fillStyle = "#1a252f"; ctx.beginPath(); ctx.roundRect(-20, -38, 40, 14, 4); ctx.fill();
+                ctx.fillStyle = "rgba(102, 252, 241, 0.4)"; ctx.fillRect(-16, -36, 12, 10);
+
+                // 雙排側車窗
+                ctx.fillStyle = "#2c3e50";
+                for(let i=0; i<3; i++) {
+                    ctx.fillRect(-21, -2, 4, 10 + i*0);
+                    ctx.fillRect(17, -2, 4, 10 + i*0);
+                }
+
+                // 閃爍校車爆閃燈
+                ctx.fillStyle = (tickCount % 20 < 10) ? "#ff4757" : "#ffda79";
+                ctx.shadowColor = "#ff4757"; ctx.shadowBlur = 8;
+                ctx.beginPath(); ctx.arc(-16, -42, 4, 0, Math.PI * 2); ctx.arc(16, -42, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+
+            } else if (style === 'rocket') { // 🚀 光速太空火箭 (精細版)
+                // 噴射動態火焰 (三重高溫漸層)
+                const fireH = Math.random() * 22 + 25;
                 const fireGrad = ctx.createLinearGradient(0, 35, 0, 35 + fireH);
-                fireGrad.addColorStop(0, "#ffda79");
-                fireGrad.addColorStop(0.5, "#ff4757");
+                fireGrad.addColorStop(0, "#ffffff");
+                fireGrad.addColorStop(0.3, "#ffda79");
+                fireGrad.addColorStop(0.7, "#ff4757");
                 fireGrad.addColorStop(1, "transparent");
                 ctx.fillStyle = fireGrad;
                 ctx.beginPath();
-                ctx.moveTo(-12, 35); ctx.lineTo(0, 35 + fireH); ctx.lineTo(12, 35);
+                ctx.moveTo(-14, 35); ctx.lineTo(0, 35 + fireH); ctx.lineTo(14, 35);
                 ctx.fill();
 
-                // 火箭主體
-                ctx.fillStyle = "#e0e0e0";
+                // 火箭金屬鈦合金車身
+                const rocketGrad = ctx.createLinearGradient(-20, 0, 20, 0);
+                rocketGrad.addColorStop(0, "#bdc3c7");
+                rocketGrad.addColorStop(0.5, "#ffffff");
+                rocketGrad.addColorStop(1, "#7f8c8d");
+                ctx.fillStyle = rocketGrad;
+
                 ctx.beginPath();
-                ctx.moveTo(0, -50); ctx.lineTo(18, -10); ctx.lineTo(18, 35); ctx.lineTo(-18, 35); ctx.lineTo(-18, -10);
+                ctx.moveTo(0, -52); ctx.lineTo(18, -12); ctx.lineTo(18, 35); ctx.lineTo(-18, 35); ctx.lineTo(-18, -12);
                 ctx.closePath(); ctx.fill();
 
-                // 彈頭顏色
+                // 火箭頭部與兩側翼 (自訂主題色)
                 ctx.fillStyle = color;
-                ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(18, -10); ctx.lineTo(-18, -10); ctx.closePath(); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(0, -52); ctx.lineTo(18, -12); ctx.lineTo(-18, -12); ctx.closePath(); ctx.fill();
+                ctx.fillRect(-28, 12, 10, 24); ctx.fillRect(18, 12, 10, 24);
 
-                // 機翼
-                ctx.fillStyle = color;
-                ctx.fillRect(-26, 15, 8, 20); ctx.fillRect(18, 15, 8, 20);
+                // 立體太空舷窗 (帶青藍發光邊框)
+                ctx.fillStyle = "#0f3460"; ctx.strokeStyle = "#66fcf1"; ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.arc(0, 5, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(-3, 2, 3, 0, Math.PI * 2); ctx.fill();
 
-                // 圓形舷窗
-                ctx.fillStyle = "#66fcf1"; ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(0, 5, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-            } else if (style === 'police') { // 🚓 酷炫警車
-                ctx.fillStyle = "#111"; // 黑白警車車身
-                ctx.beginPath(); ctx.roundRect(-22, -40, 44, 80, 10); ctx.fill();
-                ctx.fillStyle = "#ffffff";
-                ctx.fillRect(-22, -15, 44, 30); // 中間白色
-
-                // 警車頭與車窗
-                ctx.fillStyle = "#222"; ctx.fillRect(-18, -30, 36, 12);
-
-                // 動態警燈 (紅藍交替閃爍)
-                const isRedLeft = Math.floor(tickCount / 10) % 2 === 0;
-                ctx.fillStyle = isRedLeft ? "#ff4757" : "#1e90ff"; ctx.fillRect(-12, -8, 10, 5);
-                ctx.fillStyle = isRedLeft ? "#1e90ff" : "#ff4757"; ctx.fillRect(2, -8, 10, 5);
-
-                // POLICE 文字
-                ctx.fillStyle = "#ffffff"; ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
-                ctx.fillText("POLICE", 0, 4);
-
-            } else { // 🏎️ F1 極速賽車
+            } else if (style === 'police') { // 🚓 裝甲巡邏警車 (精細版)
+                // 超寬裝甲輪胎
                 ctx.fillStyle = "#111";
-                ctx.fillRect(-30, -25, 10, 18); ctx.fillRect(20, -25, 10, 18); // 超寬後輪
-                ctx.fillRect(-30, 15, 10, 20); ctx.fillRect(20, 15, 10, 20);
+                ctx.fillRect(-27, -25, 6, 18); ctx.fillRect(21, -25, 6, 18);
+                ctx.fillRect(-27, 12, 6, 20);  ctx.fillRect(21, 12, 6, 20);
 
-                const carGrad = ctx.createLinearGradient(-20, 0, 20, 0);
-                carGrad.addColorStop(0, color); carGrad.addColorStop(0.5, "#ffffff"); carGrad.addColorStop(1, color);
-                ctx.fillStyle = carGrad;
+                // 警車黑白配色流線車體
+                ctx.fillStyle = "#1a1a1a";
+                ctx.beginPath(); ctx.roundRect(-22, -40, 44, 80, 10); ctx.fill();
+
+                // 車門白色區塊
+                ctx.fillStyle = "#f5f6fa"; ctx.fillRect(-22, -12, 44, 26);
+
+                // 擋風玻璃
+                ctx.fillStyle = "#2c3e50"; ctx.beginPath(); ctx.roundRect(-17, -28, 34, 14, 3); ctx.fill();
+
+                // 車頂紅藍 LED 警示燈列 (高頻交替發光)
+                const isRedLeft = Math.floor(tickCount / 8) % 2 === 0;
+                ctx.fillStyle = isRedLeft ? "#ff4757" : "#1e90ff";
+                ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10;
+                ctx.fillRect(-14, -8, 12, 6);
+                ctx.fillStyle = isRedLeft ? "#1e90ff" : "#ff4757";
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.fillRect(2, -8, 12, 6);
+                ctx.shadowBlur = 0;
+
+                // 車身 POLICE 標語
+                ctx.fillStyle = "#111"; ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
+                ctx.fillText("POLICE", 0, 5);
+
+            } else { // 🏎️ F1 競速超跑 (精細版)
+                // 寬幅賽車輪胎 (帶金屬輪框)
+                ctx.fillStyle = "#111";
+                ctx.fillRect(-30, -28, 9, 20); ctx.fillRect(21, -28, 9, 20);
+                ctx.fillRect(-30, 15, 9, 22);  ctx.fillRect(21, 15, 9, 22);
+                ctx.fillStyle = "#7f8c8d";
+                ctx.fillRect(-28, -22, 5, 8);  ctx.fillRect(23, -22, 5, 8);
+
+                // 流線型狹長車身與立體塗裝漸層
+                const f1Grad = ctx.createLinearGradient(-20, 0, 20, 0);
+                f1Grad.addColorStop(0, color);
+                f1Grad.addColorStop(0.5, "#ffffff");
+                f1Grad.addColorStop(1, color);
+                ctx.fillStyle = f1Grad;
 
                 ctx.beginPath();
-                ctx.moveTo(0, -48); ctx.lineTo(16, -10); ctx.lineTo(14, 35); ctx.lineTo(-14, 35); ctx.lineTo(-16, -10);
+                ctx.moveTo(0, -50); ctx.lineTo(16, -15); ctx.lineTo(14, 35); ctx.lineTo(-14, 35); ctx.lineTo(-16, -15);
                 ctx.closePath(); ctx.fill();
 
-                // F1 大尾翼
-                ctx.fillStyle = "#222"; ctx.fillRect(-26, 32, 52, 8);
+                // F1 前鼻翼與駕駛艙防滾籠
+                ctx.fillStyle = "#2c3e50"; ctx.fillRect(-18, -48, 36, 6);
+                ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(0, -2, 7, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = "#e74c3c"; ctx.beginPath(); ctx.arc(0, -4, 4, 0, Math.PI * 2); ctx.fill(); // 賽車手頭盔
+
+                // 碳纖維大型雙層尾翼
+                ctx.fillStyle = "#111"; ctx.fillRect(-26, 30, 52, 9);
+                ctx.fillStyle = color; ctx.fillRect(-26, 32, 52, 3);
             }
 
             ctx.restore();
@@ -568,7 +607,6 @@
             ctx.fillStyle = "#0b0c10";
             ctx.fillRect(0, 0, 800, 600);
 
-            // 動態跑道與條紋
             roadOffset = (roadOffset + obstacleSpeed) % 40;
             ctx.strokeStyle = "rgba(102, 252, 241, 0.15)";
             ctx.lineWidth = 2;
