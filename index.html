@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小六分數小數互化體感賽車 - 老師管理版</title>
+    <title>小六分數小數互化體感賽車 - 炫彩粒子版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
@@ -104,7 +104,7 @@
         <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
             <h1 style="font-size: 32px; margin-bottom: 5px; color: #66fcf1; text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);">🏎️ 小六分數小數互化體感賽車</h1>
-            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜管理員維護版</p>
+            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜和弦特效版</p>
             
             <div class="form-group">
                 <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 130px;">
@@ -165,18 +165,23 @@
         let selectedCarStyle = "classic";
 
         let score = 0, timeLeft = 60, gameActive = false, isCalibrated = false;
+        let comboCount = 0; // 連擊計數器
+        let particles = []; // 答對粒子系統
+        let floatingTexts = []; // 浮空文字特效
+        let helperHint = ""; // 錯題提示
+
         let isAdminMode = false;
         let currentLane = 1;
         const laneXPositions = [133, 400, 666];
 
-        let currentProblem = { question: "", options: [], correctLane: 1 };
+        let currentProblem = { question: "", options: [], correctLane: 1, tip: "" };
         let obstacleY = -60, obstacleSpeed = 3.2;
         let roadOffset = 0;
         let statusMsg = "請面向鏡頭正中間進行校準...";
         let baseCenterX = null;
         const sensitivityThreshold = 18;
 
-        // 音效系統
+        // 🔊 音效系統 (強化版和弦)
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -184,40 +189,54 @@
 
         function playSound(type) {
             if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
             const now = audioCtx.currentTime;
 
-            if (type === 'correct') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, now);
-                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.2);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-                osc.start(now); osc.stop(now + 0.2);
+            if (type === 'correct') { // 強化版 C6 -> E6 -> G6 和弦歡慶音
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+                    gain.gain.setValueAtTime(0.3, now + idx * 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.25);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.05);
+                    osc.stop(now + idx * 0.05 + 0.25);
+                });
             } else if (type === 'wrong') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
                 osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(180, now);
-                osc.frequency.linearRampToValueAtTime(110, now + 0.25);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-                osc.start(now); osc.stop(now + 0.25);
+                osc.frequency.setValueAtTime(160, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.3);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(now); osc.stop(now + 0.3);
             } else if (type === 'engine') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(100, now);
-                osc.frequency.exponentialRampToValueAtTime(300, now + 0.4);
-                gain.gain.setValueAtTime(0.4, now);
+                osc.frequency.exponentialRampToValueAtTime(320, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.start(now); osc.stop(now + 0.4);
             } else if (type === 'calibrate') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(880, now);
                 gain.gain.setValueAtTime(0.2, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.start(now); osc.stop(now + 0.15);
             } else if (type === 'finish') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(440, now);
                 osc.frequency.setValueAtTime(554.37, now + 0.1);
@@ -225,8 +244,28 @@
                 osc.frequency.setValueAtTime(880, now + 0.3);
                 gain.gain.setValueAtTime(0.3, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.start(now); osc.stop(now + 0.6);
             }
+        }
+
+        // ✨ 建立答對金色爆炸粒子
+        function createExplosion(x, y) {
+            for (let i = 0; i < 25; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10 - 3,
+                    color: ['#ffda79', '#66fcf1', '#ff4757', '#ffffff'][Math.floor(Math.random() * 4)],
+                    size: Math.random() * 6 + 3,
+                    alpha: 1.0
+                });
+            }
+        }
+
+        // 浮空動態文字 (Combo / +10 分)
+        function addFloatingText(x, y, text, color) {
+            floatingTexts.push({ x: x, y: y, text: text, color: color, alpha: 1.0, vy: -2 });
         }
 
         const fractionData = [
@@ -272,7 +311,12 @@
                 }
             }
 
-            currentProblem = { question: questionText, options: options, correctLane: correctLane };
+            currentProblem = { 
+                question: questionText, 
+                options: options, 
+                correctLane: correctLane,
+                tip: `${target.frac} ＝ ${target.dec}`
+            };
             obstacleY = -60;
         }
 
@@ -300,6 +344,7 @@
             document.getElementById('start-overlay').style.display = 'none';
 
             score = 0; timeLeft = 60; isCalibrated = false; isAdminMode = false;
+            comboCount = 0; helperHint = "";
             generateProblem();
 
             requestAnimationFrame(gameLoop);
@@ -517,46 +562,102 @@
                     drawOptionBlock(laneXPositions[i], obstacleY, currentProblem.options[i]);
                 }
 
+                const carX = laneXPositions[currentLane];
+
+                // 碰撞與得分
                 if (obstacleY >= 440 && obstacleY <= 490) {
                     if (currentLane === currentProblem.correctLane) {
-                        score += 10;
+                        comboCount++;
+                        const bonusScore = 10 + (comboCount > 1 ? comboCount * 2 : 0);
+                        score += bonusScore;
+                        
                         playSound('correct');
+                        createExplosion(carX, 470); // 噴發粒子
+                        
+                        if (comboCount > 1) {
+                            addFloatingText(carX, 430, `🔥 ${comboCount} COMBO! +${bonusScore}`, "#ffda79");
+                        } else {
+                            addFloatingText(carX, 430, `+10`, "#66fcf1");
+                        }
+
+                        helperHint = ""; // 清空提示
                         generateProblem();
                     } else {
+                        comboCount = 0; // 重置 Combo
                         score = Math.max(0, score - 5);
                         playSound('wrong');
+                        addFloatingText(carX, 430, `-5`, "#ff4757");
+
+                        // 顯示學習複習提示
+                        helperHint = `💡 複習小提示：${currentProblem.tip}`;
                         obstacleY = -60;
                     }
                 } else if (obstacleY > 600) {
                     obstacleY = -60;
                 }
 
-                const carX = laneXPositions[currentLane];
+                // 畫賽車
                 drawCar(carX, 490, selectedCarColor, selectedCarStyle);
 
+                // 渲染粒子特效
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let p = particles[i];
+                    p.x += p.vx; p.y += p.vy; p.alpha -= 0.03;
+                    if (p.alpha <= 0) particles.splice(i, 1);
+                    else {
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = p.alpha;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
+
+                // 渲染浮空文字
+                for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                    let ft = floatingTexts[i];
+                    ft.y += ft.vy; ft.alpha -= 0.02;
+                    if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+                    else {
+                        ctx.font = "bold 24px Arial";
+                        ctx.fillStyle = ft.color;
+                        ctx.globalAlpha = ft.alpha;
+                        ctx.textAlign = "center";
+                        ctx.fillText(ft.text, ft.x, ft.y);
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
+
+                // 頂部 HUD 面板
                 ctx.fillStyle = "rgba(31, 40, 51, 0.85)";
                 ctx.beginPath();
                 ctx.roundRect(150, 10, 500, 75, 12);
                 ctx.fill();
-                ctx.strokeStyle = "#66fcf1";
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
+                ctx.strokeStyle = "#66fcf1"; ctx.lineWidth = 1.5; ctx.stroke();
 
                 ctx.fillStyle = "#66fcf1";
                 ctx.font = "bold 26px Arial";
                 ctx.textAlign = "center";
                 ctx.fillText(`題目：${currentProblem.question}`, 400, 42);
 
+                // 顯示學習小提示或狀態
                 ctx.font = "14px Arial";
-                ctx.fillStyle = "#ffda79";
-                ctx.fillText(statusMsg, 400, 70);
+                ctx.fillStyle = helperHint ? "#ffda79" : "#c5c6c7";
+                ctx.fillText(helperHint || statusMsg, 400, 70);
 
+                // 左上方面板 (得分/時間/連擊)
                 ctx.font = "bold 18px Arial";
                 ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "left";
                 ctx.fillText(`得分: ${score}`, 25, 35);
                 ctx.fillText(`時間: ${timeLeft}s`, 25, 65);
                 ctx.fillText(`學生: ${studentInfo.class} ${studentInfo.name}`, 25, 95);
+
+                if (comboCount > 1) {
+                    ctx.fillStyle = "#ffda79";
+                    ctx.fillText(`🔥 ${comboCount} 連擊`, 25, 125);
+                }
 
                 requestAnimationFrame(gameLoop);
             }
@@ -590,7 +691,6 @@
             const tbody = document.getElementById('leaderboard-body');
             tbody.innerHTML = '';
 
-            // 控制管理者功能欄位顯隱
             const adminCols = document.querySelectorAll('.admin-col');
             const clearBtn = document.getElementById('clear-all-btn');
             
@@ -616,10 +716,9 @@
             });
         }
 
-        // ⚙️ 老師管理專區
         function openTeacherPanel() {
-            const pwd = prompt("請輸入老師管理密碼 :");
-            if (pwd === "9878") {
+            const pwd = prompt("請輸入老師管理密碼 (預設: 1234):");
+            if (pwd === "1234") {
                 isAdminMode = true;
                 document.getElementById('end-title').innerText = "⚙️ 排行榜老師管理後台";
                 document.getElementById('final-score-text').innerText = "提示：您可以在此修改學生姓名、班別、分數，或刪除單筆紀錄。";
