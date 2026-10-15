@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>數學校園體感賽車</title>
+    <title>數學校園體感賽車 - 極速版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
@@ -64,7 +64,7 @@
 
         <div id="start-overlay">
             <h1 style="font-size: 36px; margin-bottom: 10px;">🏎️ 數學校園體感賽車</h1>
-            <p style="color: #a4b0be; margin-bottom: 30px;">透過頭部左右移動切換跑道，選擇正確答案！</p>
+            <p style="color: #a4b0be; margin-bottom: 30px;">透過頭部左右微傾切換跑道，選擇正確答案！</p>
             <button id="start-btn" onclick="startGame()">點擊開始遊戲 🚀</button>
             <div id="loading-text"></div>
         </div>
@@ -88,7 +88,9 @@
         let obstacleSpeed = 3.5;
         let statusMsg = "AI 體感載入中...";
 
-        // 產生隨機加減法題目
+        // 體感中心基準點 (自動校準)
+        let baseCenterX = null;
+
         function generateProblem() {
             const a = Math.floor(Math.random() * 15) + 1;
             const b = Math.floor(Math.random() * 15) + 1;
@@ -134,22 +136,22 @@
 
             try {
                 video = document.getElementById('webcam');
-                // 低解析度設定以提高偵測速度
+                // 超低解析度輸入，極致壓縮運算時間
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 160, height: 120, facingMode: 'user' }, audio: false
+                    video: { width: 120, height: 90, facingMode: 'user' }, audio: false
                 });
                 video.srcObject = stream;
                 await new Promise(r => video.onloadedmetadata = r);
                 video.play();
 
-                statusMsg = "載入高幀率 AI 模型中...";
+                statusMsg = "載入極速模型中...";
                 model = await blazeface.load();
-                statusMsg = "極速體感控制已就緒！";
+                statusMsg = "零延遲體感已就緒！";
                 
                 detectPoseLoop();
             } catch (err) {
                 console.error("鏡頭/AI 載入異常: ", err);
-                statusMsg = "⚠️ 體感無效（支援方向鍵 ← → 操作）";
+                statusMsg = "⚠️ 體感無效（支援鍵盤 ← → 操作）";
                 
                 window.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
@@ -161,25 +163,34 @@
         async function detectPoseLoop() {
             if (model && video && video.readyState >= 2) {
                 try {
-                    // 低延遲高頻率偵測
-                    const predictions = await model.estimateFaces(video, false, false, 0.25);
+                    const predictions = await model.estimateFaces(video, false, false, 0.2);
                     if (predictions.length > 0) {
                         const face = predictions[0];
-                        const centerX = (face.topLeft[0] + face.bottomRight[0]) / 2;
-                        const targetX = 800 - (centerX * (800 / video.videoWidth));
+                        const currentX = (face.topLeft[0] + face.bottomRight[0]) / 2;
 
-                        // 敏捷車道判定
-                        if (targetX < 300) currentLane = 0;
-                        else if (targetX > 500) currentLane = 2;
-                        else currentLane = 1;
+                        // 設定初始中心參考點
+                        if (baseCenterX === null) {
+                            baseCenterX = currentX;
+                        }
+
+                        // 計算相對偏移量 (鏡像處理)
+                        const deltaX = baseCenterX - currentX;
+
+                        // 敏捷閾值觸發切換：稍微向左/右傾斜 12px 即可秒切換車道
+                        if (deltaX < -12) {
+                            currentLane = 0; // 左車道
+                        } else if (deltaX > 12) {
+                            currentLane = 2; // 右車道
+                        } else {
+                            currentLane = 1; // 中車道
+                        }
                     }
                 } catch (e) {
                     console.error(e);
                 }
             }
             if (gameActive) {
-                // 使用 setTimeout 確保高頻極速刷新
-                setTimeout(detectPoseLoop, 15);
+                requestAnimationFrame(detectPoseLoop);
             }
         }
 
