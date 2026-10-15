@@ -23,6 +23,7 @@
             background: #0f3460;
             border-radius: 12px;
             overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         canvas { width: 100%; height: 100%; display: block; }
         #webcam-container {
@@ -48,7 +49,6 @@
         const ctx = canvas.getContext('2d');
         let model, video;
 
-        // 畫畫基本遊戲底圖與跑道
         function drawScene() {
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
@@ -65,7 +65,6 @@
         async function init() {
             drawScene();
             
-            // 1. 設定相機
             video = document.getElementById('webcam');
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 320, height: 240, facingMode: 'user' },
@@ -75,48 +74,51 @@
             await new Promise(r => video.onloadedmetadata = r);
             video.play();
 
-            // 2. 載入 BlazeFace 模型
             model = await blazeface.load();
-            
-            // 3. 啟動無窮迴圈進行體感偵測
             requestAnimationFrame(detectLoop);
         }
 
         async function detectLoop() {
-            drawScene(); // 先畫背景
+            drawScene();
 
             if (model && video && video.readyState >= 2) {
                 const predictions = await model.estimateFaces(video, false);
 
                 if (predictions.length > 0) {
                     const face = predictions[0];
-                    const leftEye = face.landmarks[0]; // 取得眼部坐標
+                    const start = face.topLeft;
+                    const end = face.bottomRight;
 
-                    if (leftEye) {
-                        // 計算畫布上的對應坐標（進行鏡像轉換）
-                        const targetX = 800 - (leftEye[0] * (800 / video.videoWidth));
-                        const targetY = leftEye[1] * (600 / video.videoHeight);
+                    // 計算人臉的中心點坐標
+                    const centerX = start[0] + (end[0] - start[0]) / 2;
+                    const centerY = start[1] + (end[1] - start[1]) / 2;
 
-                        // 畫跟隨頭部的紅點
-                        ctx.fillStyle = "#ff4757";
-                        ctx.beginPath();
-                        ctx.arc(targetX, targetY, 25, 0, 2 * Math.PI);
-                        ctx.fill();
+                    // 映射到 Canvas 畫布尺寸（並進行鏡像反轉）
+                    const targetX = 800 - (centerX * (800 / video.videoWidth));
+                    const targetY = centerY * (600 / video.videoHeight);
 
-                        ctx.fillStyle = "#ffffff";
-                        ctx.font = "20px Arial";
-                        ctx.textAlign = "center";
-                        ctx.fillText("✅ 成功控制！請左右移動頭部", 400, 50);
-                    }
-                } else {
+                    // 繪製控制賽車（亮紅色光圈圓點）
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = "#ff4757";
+                    ctx.fillStyle = "#ff4757";
+                    ctx.beginPath();
+                    ctx.arc(targetX, targetY, 25, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.shadowBlur = 0; // 還原發光
+
+                    // 顯示成功提示文字
                     ctx.fillStyle = "#ffffff";
-                    ctx.font = "20px Arial";
+                    ctx.font = "22px Arial";
                     ctx.textAlign = "center";
-                    ctx.fillText("🔍 搜尋人臉中，請面向鏡頭...", 400, 300);
+                    ctx.fillText("🏎️ 體感控制中！請嘗試左右晃動身體", 400, 50);
+                } else {
+                    ctx.fillStyle = "#eccc68";
+                    ctx.font = "22px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillText("🔍 請面向鏡頭以啟用體感控制...", 400, 300);
                 }
             }
 
-            // 保持持續刷新
             requestAnimationFrame(detectLoop);
         }
 
