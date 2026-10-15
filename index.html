@@ -34,21 +34,19 @@
         }
         #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         
-        /* 彈窗蓋頁 */
         .overlay {
             position: absolute; top: 0; left: 0;
             width: 800px; height: 600px;
             background: rgba(15, 52, 96, 0.96);
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            z-index: 20;
-            padding: 20px;
+            z-index: 20; padding: 20px;
         }
         .form-group {
-            display: flex; gap: 10px; margin-bottom: 20px;
+            display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center;
         }
         input, select {
-            padding: 10px 15px; font-size: 18px; border-radius: 8px;
+            padding: 8px 12px; font-size: 16px; border-radius: 8px;
             border: 2px solid #1e90ff; background: #16213e; color: white;
             outline: none; text-align: center;
         }
@@ -61,14 +59,11 @@
         }
         .btn:active { transform: scale(0.95); }
         
-        /* 排行榜表格 */
         table {
-            width: 90%; border-collapse: collapse; margin-top: 15px;
-            background: #16213e; border-radius: 8px; overflow: hidden;
+            width: 95%; border-collapse: collapse; margin-top: 10px;
+            background: #16213e; border-radius: 8px; overflow: hidden; font-size: 14px;
         }
-        th, td {
-            padding: 10px; text-align: center; border-bottom: 1px solid #0f3460;
-        }
+        th, td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #0f3460; }
         th { background: #1e90ff; color: white; }
 
         #recalibrate-btn {
@@ -89,69 +84,131 @@
         </div>
         <button id="recalibrate-btn" onclick="recalibrateCenter()">🎯 校準頭部位置</button>
 
-        <!-- 開始與學生資訊輸入頁面 -->
+        <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
-            <h1 style="font-size: 32px; margin-bottom: 5px; color: #eccc68;">🏎️ 小六分數小數互化賽車</h1>
-            <p style="color: #a4b0be; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜iPad 體感優化版</p>
+            <h1 style="font-size: 30px; margin-bottom: 5px; color: #eccc68;">🏎️ 小六分數小數互化體感賽車</h1>
+            <p style="color: #a4b0be; margin-bottom: 15px;">分母 2, 4, 5, 8 專題練習｜iPad 體感與音效版</p>
             
             <div class="form-group">
-                <input type="text" id="student-class" placeholder="班別 (如: 6A)" style="width: 130px;">
-                <input type="text" id="student-name" placeholder="學生姓名" style="width: 160px;">
+                <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 120px;">
+                <input type="text" id="student-name" placeholder="學生姓名" style="width: 140px;">
             </div>
 
-            <button class="btn" onclick="startGame()">點擊開始挑戰 🚀</button>
-            <div id="loading-text" style="color: #eccc68; margin-top: 15px;"></div>
+            <!-- 車款與顏色選擇 -->
+            <div class="form-group">
+                <label style="align-self: center; font-weight: bold;">賽車款式：</label>
+                <select id="car-style">
+                    <option value="classic">🏎️ 經典超跑</option>
+                    <option value="cyber">⚡ 概念極速車</option>
+                    <option value="armored">🛡️ 裝甲賽車</option>
+                </select>
+
+                <label style="align-self: center; font-weight: bold; margin-left: 10px;">車身顏色：</label>
+                <select id="car-color">
+                    <option value="#ff4757">❤️ 經典紅</option>
+                    <option value="#1e90ff">💙 炫光藍</option>
+                    <option value="#2ed573">💚 疾速綠</option>
+                    <option value="#ff6b81">💖 櫻花粉</option>
+                </select>
+            </div>
+
+            <button class="btn" onclick="startGame()" style="margin-top: 10px;">點擊發動引擎 🚀</button>
+            <div id="loading-text" style="color: #eccc68; margin-top: 10px;"></div>
         </div>
 
-        <!-- 排行榜與結束結算頁面 -->
+        <!-- 英雄榜頁面 -->
         <div id="end-overlay" class="overlay" style="display: none;">
-            <h2 style="font-size: 32px; margin: 0 0 10px 0; color: #ff4757;">🎉 挑戰結束！</h2>
-            <p id="final-score-text" style="font-size: 24px; margin-bottom: 15px;"></p>
+            <h2 style="font-size: 28px; margin: 0 0 5px 0; color: #ff4757;">🎉 挑戰結束！</h2>
+            <p id="final-score-text" style="font-size: 20px; margin-bottom: 10px;"></p>
             
-            <h3 style="margin: 5px 0; color: #eccc68;">🏆 班級英雄榜 (Top 5)</h3>
-            <table id="leaderboard-table">
-                <thead>
-                    <tr><th>名次</th><th>日期</th><th>班別</th><th>姓名</th><th>得分</th></tr>
-                </thead>
-                <tbody id="leaderboard-body"></tbody>
-            </table>
+            <h3 style="margin: 5px 0; color: #eccc68;">🏆 班級英雄榜 (Top 10)</h3>
+            <div style="max-height: 280px; overflow-y: auto; width: 100%; display: flex; justify-content: center;">
+                <table id="leaderboard-table">
+                    <thead>
+                        <tr><th>名次</th><th>日期</th><th>班別</th><th>姓名</th><th>得分</th></tr>
+                    </thead>
+                    <tbody id="leaderboard-body"></tbody>
+                </table>
+            </div>
 
-            <button class="btn" onclick="restartGame()" style="margin-top: 20px;">再次挑戰 🔄</button>
+            <button class="btn" onclick="restartGame()" style="margin-top: 15px;">再次挑戰 🔄</button>
         </div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let model = null;
-        let video = null;
+        let model = null, video = null;
 
-        // 學生資料與遊戲變數
+        // 學生資料與選擇設定
         let studentInfo = { name: "", class: "", date: "" };
-        let score = 0;
-        let timeLeft = 60;
-        let gameActive = false;
-        let currentLane = 1; // 0: 左, 1: 中, 2: 右
+        let selectedCarColor = "#ff4757";
+        let selectedCarStyle = "classic";
+
+        let score = 0, timeLeft = 60, gameActive = false;
+        let currentLane = 1;
         const laneXPositions = [133, 400, 666];
 
         let currentProblem = { question: "", options: [], correctLane: 1 };
-        let obstacleY = -50;
-        let obstacleSpeed = 3.2;
+        let obstacleY = -50, obstacleSpeed = 3.2;
         let statusMsg = "AI 體感載入中...";
-
         let baseCenterX = null;
         const sensitivityThreshold = 18;
 
+        // 🔊 原生 Web Audio API 音效生成器 (iPad 免外部檔案發聲)
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') { // 答對音效
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.2); // C6
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'wrong') { // 答錯音效
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.25);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now); osc.stop(now + 0.25);
+            } else if (type === 'engine') { // 引擎發動音效
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.4);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'finish') { // 結束歡呼聲
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554.37, now + 0.1);
+                osc.frequency.setValueAtTime(659.25, now + 0.2);
+                osc.frequency.setValueAtTime(880, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.start(now); osc.stop(now + 0.6);
+            }
+        }
+
         // 小六常用分數 (分母 2, 4, 5, 8) 與對應小數庫
         const fractionData = [
-            // 分母 2
             { frac: "1/2", dec: "0.5" },
-            // 分母 4
             { frac: "1/4", dec: "0.25" }, { frac: "3/4", dec: "0.75" },
-            // 分母 5
             { frac: "1/5", dec: "0.2" }, { frac: "2/5", dec: "0.4" },
             { frac: "3/5", dec: "0.6" }, { frac: "4/5", dec: "0.8" },
-            // 分母 8
             { frac: "1/8", dec: "0.125" }, { frac: "3/8", dec: "0.375" },
             { frac: "5/8", dec: "0.625" }, { frac: "7/8", dec: "0.875" }
         ];
@@ -161,9 +218,8 @@
             statusMsg = "🎯 已重新校準頭部正中心！";
         }
 
-        // 產生分數小數互化題目
         function generateProblem() {
-            const isFracToDec = Math.random() > 0.5; // 50% 題目為「分數轉小數」，50% 為「小數轉分數」
+            const isFracToDec = Math.random() > 0.5;
             const target = fractionData[Math.floor(Math.random() * fractionData.length)];
 
             let questionText, correctAnswer;
@@ -179,7 +235,6 @@
             const options = ["", "", ""];
             options[correctLane] = correctAnswer;
 
-            // 產生干擾選項
             for (let i = 0; i < 3; i++) {
                 if (i !== correctLane) {
                     let fake;
@@ -196,6 +251,8 @@
         }
 
         async function startGame() {
+            initAudio(); // 初始化 iPad 音效
+
             const nameInput = document.getElementById('student-name').value.trim();
             const classInput = document.getElementById('student-class').value.trim();
 
@@ -204,17 +261,19 @@
                 return;
             }
 
+            selectedCarColor = document.getElementById('car-color').value;
+            selectedCarStyle = document.getElementById('car-style').value;
+
             const today = new Date();
             studentInfo = {
-                name: nameInput,
-                class: classInput,
+                name: nameInput, class: classInput,
                 date: `${today.getMonth() + 1}/${today.getDate()}`
             };
 
+            playSound('engine');
             document.getElementById('start-overlay').style.display = 'none';
 
-            score = 0;
-            timeLeft = 60;
+            score = 0; timeLeft = 60;
             generateProblem();
             gameActive = true;
 
@@ -232,7 +291,6 @@
 
             try {
                 video = document.getElementById('webcam');
-                // iPad Safari 鏡頭相容性設定
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 160, height: 120, facingMode: 'user' }, audio: false
                 });
@@ -246,10 +304,8 @@
                 
                 detectPoseLoop();
             } catch (err) {
-                console.error("鏡頭/AI 載入異常: ", err);
-                statusMsg = "⚠️ 體感無效（可使用鍵盤 ← → 或點擊畫面左右側）";
-                
-                // iPad/電腦觸控與鍵盤支援
+                console.error(err);
+                statusMsg = "⚠️ 體感無效（可用鍵盤 ← → 操作）";
                 window.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
                     if (e.key === 'ArrowRight') currentLane = Math.min(2, currentLane + 1);
@@ -272,28 +328,72 @@
 
                         const deltaX = currentX - baseCenterX;
 
-                        if (deltaX > sensitivityThreshold) {
-                            currentLane = 0; // 頭往左偏
-                        } else if (deltaX < -sensitivityThreshold) {
-                            currentLane = 2; // 頭往右偏
-                        } else {
-                            currentLane = 1; // 居中
-                        }
+                        if (deltaX > sensitivityThreshold) currentLane = 0;
+                        else if (deltaX < -sensitivityThreshold) currentLane = 2;
+                        else currentLane = 1;
                     }
-                } catch (e) {
-                    console.error(e);
-                }
+                } catch (e) { console.error(e); }
             }
-            if (gameActive) {
-                requestAnimationFrame(detectPoseLoop);
+            if (gameActive) requestAnimationFrame(detectPoseLoop);
+        }
+
+        // 🎨 繪製立體跑車
+        function drawCar(x, y, color, style) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // 車身陰影
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.beginPath();
+            ctx.ellipse(0, 15, 30, 45, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 輪胎 (四個)
+            ctx.fillStyle = "#111";
+            ctx.fillRect(-28, -30, 8, 16);
+            ctx.fillRect(20, -30, 8, 16);
+            ctx.fillRect(-28, 15, 8, 18);
+            ctx.fillRect(20, 15, 8, 18);
+
+            // 主車身
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            if (style === 'cyber') {
+                ctx.moveTo(0, -45); ctx.lineTo(24, -10); ctx.lineTo(20, 35); ctx.lineTo(-20, 35); ctx.lineTo(-24, -10);
+            } else if (style === 'armored') {
+                ctx.moveTo(0, -35); ctx.lineTo(26, -20); ctx.lineTo(26, 35); ctx.lineTo(-26, 35); ctx.lineTo(-26, -20);
+            } else { // classic
+                ctx.moveTo(0, -40); ctx.lineTo(22, -15); ctx.lineTo(22, 35); ctx.lineTo(-22, 35); ctx.lineTo(-22, -15);
             }
+            ctx.closePath();
+            ctx.fill();
+
+            // 擋風玻璃 (車窗)
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.moveTo(-12, -10); ctx.lineTo(12, -10); ctx.lineTo(15, 5); ctx.lineTo(-15, 5);
+            ctx.closePath();
+            ctx.fill();
+
+            // 車頭燈 (亮黃燈)
+            ctx.fillStyle = "#ffda79";
+            ctx.beginPath();
+            ctx.arc(-14, -35, 4, 0, Math.PI * 2);
+            ctx.arc(14, -35, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 尾翼
+            ctx.fillStyle = "#222";
+            ctx.fillRect(-22, 32, 44, 6);
+
+            ctx.restore();
         }
 
         function gameLoop() {
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
 
-            // 賽車分隔線
+            // 跑道線
             ctx.strokeStyle = "#eccc68";
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -314,29 +414,25 @@
                     ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 34);
                 }
 
-                // 碰撞檢測
+                // 碰撞與計分判斷 + 音效發聲
                 if (obstacleY >= 450 && obstacleY <= 500) {
                     if (currentLane === currentProblem.correctLane) {
                         score += 10;
+                        playSound('correct');
                     } else {
                         score = Math.max(0, score - 5);
+                        playSound('wrong');
                     }
                     generateProblem();
                 } else if (obstacleY > 600) {
                     generateProblem();
                 }
 
-                // 畫賽車
+                // 繪製自訂跑車
                 const carX = laneXPositions[currentLane];
-                ctx.fillStyle = "#ff4757";
-                ctx.shadowColor = "#ff4757";
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.arc(carX, 500, 25, 0, 2 * Math.PI);
-                ctx.fill();
-                ctx.shadowBlur = 0;
+                drawCar(carX, 490, selectedCarColor, selectedCarStyle);
 
-                // UI
+                // UI 資訊
                 ctx.fillStyle = "#ffffff";
                 ctx.font = "bold 28px Arial";
                 ctx.textAlign = "center";
@@ -358,12 +454,11 @@
         }
 
         function endGame() {
-            // 儲存至排行榜 (LocalStorage)
+            playSound('finish');
+
             saveToLeaderboard({
-                name: studentInfo.name,
-                class: studentInfo.class,
-                date: studentInfo.date,
-                score: score
+                name: studentInfo.name, class: studentInfo.class,
+                date: studentInfo.date, score: score
             });
 
             document.getElementById('final-score-text').innerText = `${studentInfo.class} ${studentInfo.name} 最終得分：${score} 分`;
@@ -374,8 +469,8 @@
         function saveToLeaderboard(newEntry) {
             let list = JSON.parse(localStorage.getItem('math_racing_leaderboard') || '[]');
             list.push(newEntry);
-            list.sort((a, b) => b.score - a.score); // 依分數高低排序
-            list = list.slice(0, 5); // 保留前五名
+            list.sort((a, b) => b.score - a.score);
+            list = list.slice(0, 10); // 擴充保存 Top 10
             localStorage.setItem('math_racing_leaderboard', JSON.stringify(list));
         }
 
