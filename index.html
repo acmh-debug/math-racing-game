@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小六分數小數互化體感賽車</title>
+    <title>小六分數小數互化體感賽車 - 炫彩視覺版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
         * { box-sizing: border-box; touch-action: manipulation; }
         body {
             margin: 0; padding: 0;
-            background-color: #1a1a2e;
+            background-color: #0b0c10;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: white;
             display: flex; flex-direction: column;
@@ -20,58 +20,60 @@
         #game-container {
             position: relative;
             width: 800px; height: 600px;
-            background: #0f3460;
-            border-radius: 12px;
+            background: #1f2833;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8), 0 0 20px rgba(102, 252, 241, 0.2);
+            border: 2px solid #45a29e;
         }
         canvas { width: 100%; height: 100%; display: block; }
         #webcam-container {
             position: absolute; top: 15px; right: 15px;
             width: 140px; height: 105px;
-            border-radius: 8px; overflow: hidden;
-            border: 2px solid #ff4757; background: #000; z-index: 10;
+            border-radius: 10px; overflow: hidden;
+            border: 2px solid #66fcf1; background: #000; z-index: 10;
+            box-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
         }
         #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         
         .overlay {
             position: absolute; top: 0; left: 0;
             width: 800px; height: 600px;
-            background: rgba(15, 52, 96, 0.96);
+            background: rgba(11, 12, 16, 0.95);
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             z-index: 20; padding: 20px;
         }
         .form-group {
-            display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center;
+            display: flex; gap: 12px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center;
         }
         input, select {
-            padding: 8px 12px; font-size: 16px; border-radius: 8px;
-            border: 2px solid #1e90ff; background: #16213e; color: white;
+            padding: 10px 14px; font-size: 16px; border-radius: 8px;
+            border: 2px solid #66fcf1; background: #1f2833; color: white;
             outline: none; text-align: center;
         }
         .btn {
-            background: #ff4757; color: white; border: none;
-            padding: 12px 35px; font-size: 22px; font-weight: bold;
+            background: linear-gradient(135deg, #ff007f, #ff4757); color: white; border: none;
+            padding: 12px 38px; font-size: 22px; font-weight: bold;
             border-radius: 30px; cursor: pointer;
-            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
-            transition: transform 0.2s;
+            box-shadow: 0 5px 20px rgba(255, 0, 127, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         .btn:active { transform: scale(0.95); }
         
         table {
             width: 95%; border-collapse: collapse; margin-top: 10px;
-            background: #16213e; border-radius: 8px; overflow: hidden; font-size: 14px;
+            background: #1f2833; border-radius: 8px; overflow: hidden; font-size: 14px;
         }
-        th, td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #0f3460; }
-        th { background: #1e90ff; color: white; }
+        th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #0b0c10; }
+        th { background: #45a29e; color: #0b0c10; font-weight: bold; }
 
         #recalibrate-btn {
             position: absolute; bottom: 15px; right: 15px;
-            background: #1e90ff; color: white; border: none;
-            padding: 8px 15px; border-radius: 20px; font-weight: bold;
+            background: #45a29e; color: #0b0c10; border: none;
+            padding: 8px 16px; border-radius: 20px; font-weight: bold;
             cursor: pointer; z-index: 15;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -86,24 +88,23 @@
 
         <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
-            <h1 style="font-size: 30px; margin-bottom: 5px; color: #eccc68;">🏎️ 小六分數小數互化體感賽車</h1>
-            <p style="color: #a4b0be; margin-bottom: 15px;">分母 2, 4, 5, 8 專題練習｜校準啟動 & 錯題補答版</p>
+            <h1 style="font-size: 32px; margin-bottom: 5px; color: #66fcf1; text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);">🏎️ 小六分數小數互化體感賽車</h1>
+            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜極速炫彩美化版</p>
             
             <div class="form-group">
-                <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 120px;">
-                <input type="text" id="student-name" placeholder="學生姓名" style="width: 140px;">
+                <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 130px;">
+                <input type="text" id="student-name" placeholder="學生姓名" style="width: 150px;">
             </div>
 
-            <!-- 車款與顏色選擇 -->
             <div class="form-group">
-                <label style="align-self: center; font-weight: bold;">賽車款式：</label>
+                <label style="align-self: center; font-weight: bold; color: #66fcf1;">賽車款式：</label>
                 <select id="car-style">
                     <option value="classic">🏎️ 經典超跑</option>
                     <option value="cyber">⚡ 概念極速車</option>
                     <option value="armored">🛡️ 裝甲賽車</option>
                 </select>
 
-                <label style="align-self: center; font-weight: bold; margin-left: 10px;">車身顏色：</label>
+                <label style="align-self: center; font-weight: bold; color: #66fcf1; margin-left: 10px;">車身顏色：</label>
                 <select id="car-color">
                     <option value="#ff4757">❤️ 經典紅</option>
                     <option value="#1e90ff">💙 炫光藍</option>
@@ -112,16 +113,16 @@
                 </select>
             </div>
 
-            <button class="btn" onclick="startGame()" style="margin-top: 10px;">點擊發動引擎 🚀</button>
-            <div id="loading-text" style="color: #eccc68; margin-top: 10px;"></div>
+            <button class="btn" onclick="startGame()" style="margin-top: 15px;">點擊發動引擎 🚀</button>
+            <div id="loading-text" style="color: #66fcf1; margin-top: 10px;"></div>
         </div>
 
         <!-- 英雄榜頁面 -->
         <div id="end-overlay" class="overlay" style="display: none;">
-            <h2 style="font-size: 28px; margin: 0 0 5px 0; color: #ff4757;">🎉 挑戰結束！</h2>
-            <p id="final-score-text" style="font-size: 20px; margin-bottom: 10px;"></p>
+            <h2 style="font-size: 30px; margin: 0 0 5px 0; color: #ff007f; text-shadow: 0 0 10px rgba(255, 0, 127, 0.5);">🎉 挑戰結束！</h2>
+            <p id="final-score-text" style="font-size: 22px; margin-bottom: 10px; color: #66fcf1;"></p>
             
-            <h3 style="margin: 5px 0; color: #eccc68;">🏆 班級英雄榜 (Top 10)</h3>
+            <h3 style="margin: 5px 0; color: #ffda79;">🏆 班級英雄榜 (Top 10)</h3>
             <div style="max-height: 280px; overflow-y: auto; width: 100%; display: flex; justify-content: center;">
                 <table id="leaderboard-table">
                     <thead>
@@ -149,7 +150,8 @@
         const laneXPositions = [133, 400, 666];
 
         let currentProblem = { question: "", options: [], correctLane: 1 };
-        let obstacleY = -50, obstacleSpeed = 3.2;
+        let obstacleY = -60, obstacleSpeed = 3.2;
+        let roadOffset = 0; // 動態賽車跑道條紋偏移量
         let statusMsg = "請面向鏡頭正中間進行校準...";
         let baseCenterX = null;
         const sensitivityThreshold = 18;
@@ -251,7 +253,7 @@
             }
 
             currentProblem = { question: questionText, options: options, correctLane: correctLane };
-            obstacleY = -50;
+            obstacleY = -60;
         }
 
         async function startGame() {
@@ -299,7 +301,7 @@
             } catch (err) {
                 console.error(err);
                 statusMsg = "⚠️ 體感無效（可用鍵盤 ← → 操作）";
-                isCalibrated = true; // 備用模式免校準直接開始
+                isCalibrated = true;
                 startTimer();
                 window.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
@@ -334,7 +336,7 @@
                             playSound('calibrate');
                             statusMsg = "✅ 校準成功！比賽開始！";
                             isCalibrated = true;
-                            startTimer(); // 校準完成後才開始倒數計時與運算
+                            startTimer();
                         }
 
                         const deltaX = currentX - baseCenterX;
@@ -349,13 +351,69 @@
             else requestAnimationFrame(detectPoseLoop);
         }
 
+        // 🎨 美化版數字/答案格 (炫彩霓虹立體能量箱)
+        function drawOptionBlock(x, y, text) {
+            const w = 140, h = 55, r = 12;
+
+            ctx.save();
+            ctx.translate(x - w / 2, y);
+
+            // 外發光陰影
+            ctx.shadowColor = "#66fcf1";
+            ctx.shadowBlur = 12;
+
+            // 箱體暗色漸層背景
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+            bgGrad.addColorStop(0, "#1f2833");
+            bgGrad.addColorStop(1, "#0b0c10");
+            ctx.fillStyle = bgGrad;
+
+            ctx.beginPath();
+            ctx.roundRect(0, 0, w, h, r);
+            ctx.fill();
+
+            // 箱體金屬霓虹邊框
+            const borderGrad = ctx.createLinearGradient(0, 0, w, h);
+            borderGrad.addColorStop(0, "#66fcf1");
+            borderGrad.addColorStop(0.5, "#45a29e");
+            borderGrad.addColorStop(1, "#1f2833");
+            ctx.strokeStyle = borderGrad;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 頂部高光線 (增加 3D 浮雕立體感)
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(r, 3); ctx.lineTo(w - r, 3);
+            ctx.stroke();
+
+            ctx.shadowBlur = 0; // 清除陰影
+
+            // 渲染文字 (立體感與文字邊框)
+            ctx.font = "bold 26px Arial, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            // 文字陰影
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillText(text, w / 2 + 2, h / 2 + 2);
+
+            // 主文字顏色
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(text, w / 2, h / 2);
+
+            ctx.restore();
+        }
+
+        // 🏎️ 美化版立體跑車
         function drawCar(x, y, color, style) {
             ctx.save();
             ctx.translate(x, y);
 
-            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
             ctx.beginPath();
-            ctx.ellipse(0, 15, 30, 45, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 15, 32, 48, 0, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.fillStyle = "#111";
@@ -364,7 +422,13 @@
             ctx.fillRect(-28, 15, 8, 18);
             ctx.fillRect(20, 15, 8, 18);
 
-            ctx.fillStyle = color;
+            // 車身流線漸層
+            const carGrad = ctx.createLinearGradient(-20, 0, 20, 0);
+            carGrad.addColorStop(0, color);
+            carGrad.addColorStop(0.5, "#ffffff");
+            carGrad.addColorStop(1, color);
+            ctx.fillStyle = carGrad;
+
             ctx.beginPath();
             if (style === 'cyber') {
                 ctx.moveTo(0, -45); ctx.lineTo(24, -10); ctx.lineTo(20, 35); ctx.lineTo(-20, 35); ctx.lineTo(-24, -10);
@@ -376,17 +440,19 @@
             ctx.closePath();
             ctx.fill();
 
-            ctx.fillStyle = "#111";
+            ctx.fillStyle = "#0b0c10";
             ctx.beginPath();
             ctx.moveTo(-12, -10); ctx.lineTo(12, -10); ctx.lineTo(15, 5); ctx.lineTo(-15, 5);
             ctx.closePath();
             ctx.fill();
 
             ctx.fillStyle = "#ffda79";
+            ctx.shadowColor = "#ffda79"; ctx.shadowBlur = 8;
             ctx.beginPath();
             ctx.arc(-14, -35, 4, 0, Math.PI * 2);
             ctx.arc(14, -35, 4, 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0;
 
             ctx.fillStyle = "#222";
             ctx.fillRect(-22, 32, 44, 6);
@@ -395,27 +461,43 @@
         }
 
         function gameLoop() {
-            ctx.fillStyle = "#0f3460";
+            // 背景底色
+            ctx.fillStyle = "#0b0c10";
             ctx.fillRect(0, 0, 800, 600);
 
-            ctx.strokeStyle = "#eccc68";
-            ctx.lineWidth = 4;
+            // 動態跑道背景
+            roadOffset = (roadOffset + obstacleSpeed) % 40;
+            ctx.strokeStyle = "rgba(102, 252, 241, 0.15)";
+            ctx.lineWidth = 2;
+
+            // 跑道虛線
+            ctx.setLineDash([20, 20]);
+            ctx.lineDashOffset = -roadOffset;
             ctx.beginPath();
             ctx.moveTo(266, 0); ctx.lineTo(266, 600);
             ctx.moveTo(533, 0); ctx.lineTo(533, 600);
             ctx.stroke();
+            ctx.setLineDash([]); // 還原實線
 
-            // 校準未完成前顯示等待動畫與提示
+            // 跑道兩側線
+            ctx.strokeStyle = "#45a29e";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(10, 0); ctx.lineTo(10, 600);
+            ctx.moveTo(790, 0); ctx.lineTo(790, 600);
+            ctx.stroke();
+
+            // 校準提示
             if (!isCalibrated) {
-                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillStyle = "rgba(11, 12, 16, 0.7)";
                 ctx.fillRect(0, 0, 800, 600);
 
-                ctx.fillStyle = "#eccc68";
+                ctx.fillStyle = "#66fcf1";
                 ctx.font = "bold 32px Arial";
                 ctx.textAlign = "center";
                 ctx.fillText("🎯 正在校準頭部正中心...", 400, 260);
                 ctx.font = "20px Arial";
-                ctx.fillStyle = "#ffffff";
+                ctx.fillStyle = "#c5c6c7";
                 ctx.fillText("請面向螢幕正中間保持不動", 400, 310);
 
                 const carX = laneXPositions[currentLane];
@@ -427,44 +509,49 @@
             if (gameActive) {
                 obstacleY += obstacleSpeed;
 
+                // 繪製美化後的 3 個答案箱
                 for (let i = 0; i < 3; i++) {
-                    ctx.fillStyle = "#1e90ff";
-                    ctx.fillRect(laneXPositions[i] - 65, obstacleY, 130, 50);
-
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = "bold 24px Arial";
-                    ctx.textAlign = "center";
-                    ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 34);
+                    drawOptionBlock(laneXPositions[i], obstacleY, currentProblem.options[i]);
                 }
 
-                // 碰撞與補答判定
-                if (obstacleY >= 450 && obstacleY <= 500) {
+                // 碰撞判定
+                if (obstacleY >= 440 && obstacleY <= 490) {
                     if (currentLane === currentProblem.correctLane) {
                         score += 10;
                         playSound('correct');
-                        generateProblem(); // 答對才產生下一題！
+                        generateProblem();
                     } else {
                         score = Math.max(0, score - 5);
                         playSound('wrong');
-                        obstacleY = -50; // 答錯不換題，方塊重置回頂端要求補答！
+                        obstacleY = -60; // 錯題補答重置
                     }
                 } else if (obstacleY > 600) {
-                    // 超過螢幕沒吃到也算未答對，重置回到頂端
-                    obstacleY = -50;
+                    obstacleY = -60;
                 }
 
+                // 畫賽車
                 const carX = laneXPositions[currentLane];
                 drawCar(carX, 490, selectedCarColor, selectedCarStyle);
 
-                ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 28px Arial";
+                // HUD 頂部科技面板
+                ctx.fillStyle = "rgba(31, 40, 51, 0.85)";
+                ctx.beginPath();
+                ctx.roundRect(150, 10, 500, 75, 12);
+                ctx.fill();
+                ctx.strokeStyle = "#66fcf1";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.fillStyle = "#66fcf1";
+                ctx.font = "bold 26px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText(`題目：${currentProblem.question}`, 400, 45);
+                ctx.fillText(`題目：${currentProblem.question}`, 400, 42);
 
-                ctx.font = "15px Arial";
-                ctx.fillStyle = "#eccc68";
-                ctx.fillText(statusMsg, 400, 75);
+                ctx.font = "14px Arial";
+                ctx.fillStyle = "#ffda79";
+                ctx.fillText(statusMsg, 400, 70);
 
+                // 得分與時間資訊
                 ctx.font = "bold 18px Arial";
                 ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "left";
@@ -509,7 +596,7 @@
                     <td>${item.date}</td>
                     <td>${item.class}</td>
                     <td>${item.name}</td>
-                    <td style="color:#eccc68; font-weight:bold;">${item.score}</td>
+                    <td style="color:#ffda79; font-weight:bold;">${item.score}</td>
                 `;
                 tbody.appendChild(tr);
             });
