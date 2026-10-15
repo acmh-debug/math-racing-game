@@ -121,10 +121,8 @@
             generateProblem();
             gameActive = true;
 
-            // 1. 立即啟動遊戲渲染主迴圈，確保畫面絕對不會卡死
             requestAnimationFrame(gameLoop);
 
-            // 倒數計時器
             const timer = setInterval(() => {
                 if (gameActive && timeLeft > 0) {
                     timeLeft--;
@@ -134,27 +132,25 @@
                 }
             }, 1000);
 
-            // 2. 背景非同步啟動鏡頭與載入 AI 模型
             try {
                 video = document.getElementById('webcam');
+                // 低解析度設定以提高偵測速度
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 320, height: 240, facingMode: 'user' }, audio: false
+                    video: { width: 160, height: 120, facingMode: 'user' }, audio: false
                 });
                 video.srcObject = stream;
                 await new Promise(r => video.onloadedmetadata = r);
                 video.play();
 
-                statusMsg = "載入 AI 體感模型中...";
+                statusMsg = "載入高幀率 AI 模型中...";
                 model = await blazeface.load();
-                statusMsg = "體感控制已就緒！";
+                statusMsg = "極速體感控制已就緒！";
                 
-                // 背景啟動 AI 偵測迴圈
                 detectPoseLoop();
             } catch (err) {
                 console.error("鏡頭/AI 載入異常: ", err);
-                statusMsg = "⚠️ 體感無效（可以使用方向鍵 ← → 操作）";
+                statusMsg = "⚠️ 體感無效（支援方向鍵 ← → 操作）";
                 
-                // 備用鍵盤操作機制
                 window.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
                     if (e.key === 'ArrowRight') currentLane = Math.min(2, currentLane + 1);
@@ -165,25 +161,29 @@
         async function detectPoseLoop() {
             if (model && video && video.readyState >= 2) {
                 try {
-                    const predictions = await model.estimateFaces(video, false, false, 0.3);
+                    // 低延遲高頻率偵測
+                    const predictions = await model.estimateFaces(video, false, false, 0.25);
                     if (predictions.length > 0) {
                         const face = predictions[0];
                         const centerX = (face.topLeft[0] + face.bottomRight[0]) / 2;
                         const targetX = 800 - (centerX * (800 / video.videoWidth));
 
-                        if (targetX < 266) currentLane = 0;
-                        else if (targetX > 533) currentLane = 2;
+                        // 敏捷車道判定
+                        if (targetX < 300) currentLane = 0;
+                        else if (targetX > 500) currentLane = 2;
                         else currentLane = 1;
                     }
                 } catch (e) {
                     console.error(e);
                 }
             }
-            if (gameActive) requestAnimationFrame(detectPoseLoop);
+            if (gameActive) {
+                // 使用 setTimeout 確保高頻極速刷新
+                setTimeout(detectPoseLoop, 15);
+            }
         }
 
         function gameLoop() {
-            // 背景與跑道
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
 
@@ -195,7 +195,6 @@
             ctx.stroke();
 
             if (gameActive) {
-                // 題目算式障礙物下落
                 obstacleY += obstacleSpeed;
 
                 for (let i = 0; i < 3; i++) {
@@ -208,7 +207,6 @@
                     ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 33);
                 }
 
-                // 判定碰撞 (車子位於 Y: 500)
                 if (obstacleY >= 450 && obstacleY <= 500) {
                     if (currentLane === currentProblem.correctLane) {
                         score += 10;
@@ -220,7 +218,6 @@
                     generateProblem();
                 }
 
-                // 畫玩家賽車
                 const carX = laneXPositions[currentLane];
                 ctx.fillStyle = "#ff4757";
                 ctx.shadowColor = "#ff4757";
@@ -230,7 +227,6 @@
                 ctx.fill();
                 ctx.shadowBlur = 0;
 
-                // UI 顯示
                 ctx.fillStyle = "#ffffff";
                 ctx.font = "bold 28px Arial";
                 ctx.textAlign = "center";
@@ -248,7 +244,6 @@
 
                 requestAnimationFrame(gameLoop);
             } else {
-                // 結束結算
                 ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
                 ctx.fillRect(0, 0, 800, 600);
 
