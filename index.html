@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>數學校園體感賽車 - 極速版</title>
+    <title>數學校園體感賽車 - 校準強化版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
@@ -52,6 +52,17 @@
         }
         #start-btn:hover { transform: scale(1.05); }
         #loading-text { font-size: 18px; color: #eccc68; margin-top: 15px; }
+
+        /* 校準按鈕 */
+        #recalibrate-btn {
+            position: absolute;
+            bottom: 15px; right: 15px;
+            background: #1e90ff; color: white;
+            border: none; padding: 8px 15px;
+            border-radius: 20px; font-weight: bold;
+            cursor: pointer; z-index: 15;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -61,6 +72,7 @@
         <div id="webcam-container">
             <video id="webcam" autoplay playsinline muted></video>
         </div>
+        <button id="recalibrate-btn" onclick="recalibrateCenter()">🎯 重新校準頭部正中心</button>
 
         <div id="start-overlay">
             <h1 style="font-size: 36px; margin-bottom: 10px;">🏎️ 數學校園體感賽車</h1>
@@ -88,8 +100,14 @@
         let obstacleSpeed = 3.5;
         let statusMsg = "AI 體感載入中...";
 
-        // 體感中心基準點 (自動校準)
+        // 體感中心基準點與閥值
         let baseCenterX = null;
+        const sensitivityThreshold = 18; // 傾斜切換車道的像素門檻 (可調大小)
+
+        function recalibrateCenter() {
+            baseCenterX = null; // 重置基準點，下一幀自動設為正中心
+            statusMsg = "🎯 已重新校準頭部正中心！";
+        }
 
         function generateProblem() {
             const a = Math.floor(Math.random() * 15) + 1;
@@ -136,17 +154,16 @@
 
             try {
                 video = document.getElementById('webcam');
-                // 超低解析度輸入，極致壓縮運算時間
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 120, height: 90, facingMode: 'user' }, audio: false
+                    video: { width: 160, height: 120, facingMode: 'user' }, audio: false
                 });
                 video.srcObject = stream;
                 await new Promise(r => video.onloadedmetadata = r);
                 video.play();
 
-                statusMsg = "載入極速模型中...";
+                statusMsg = "載入模型中...";
                 model = await blazeface.load();
-                statusMsg = "零延遲體感已就緒！";
+                statusMsg = "請保持頭部居中...";
                 
                 detectPoseLoop();
             } catch (err) {
@@ -168,21 +185,21 @@
                         const face = predictions[0];
                         const currentX = (face.topLeft[0] + face.bottomRight[0]) / 2;
 
-                        // 設定初始中心參考點
+                        // 自動記錄開局前幾幀的平均座標作為中心點
                         if (baseCenterX === null) {
                             baseCenterX = currentX;
+                            statusMsg = "✅ 正中心校準完成！";
                         }
 
-                        // 計算相對偏移量 (鏡像處理)
-                        const deltaX = baseCenterX - currentX;
+                        // 正確的鏡像左右位移計算
+                        const deltaX = currentX - baseCenterX;
 
-                        // 敏捷閾值觸發切換：稍微向左/右傾斜 12px 即可秒切換車道
-                        if (deltaX < -12) {
-                            currentLane = 0; // 左車道
-                        } else if (deltaX > 12) {
-                            currentLane = 2; // 右車道
+                        if (deltaX > sensitivityThreshold) {
+                            currentLane = 0; // 頭往左偏 (視訊畫面鏡像)
+                        } else if (deltaX < -sensitivityThreshold) {
+                            currentLane = 2; // 頭往右偏
                         } else {
-                            currentLane = 1; // 中車道
+                            currentLane = 1; // 居中跑道
                         }
                     }
                 } catch (e) {
