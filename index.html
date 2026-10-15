@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小六分數小數互化體感賽車 - 炫彩粒子版</title>
+    <title>小六分數小數互化體感賽車 - 趣味車款與賽道美化版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
@@ -104,7 +104,7 @@
         <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
             <h1 style="font-size: 32px; margin-bottom: 5px; color: #66fcf1; text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);">🏎️ 小六分數小數互化體感賽車</h1>
-            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜和弦特效版</p>
+            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜趣味載具版</p>
             
             <div class="form-group">
                 <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 130px;">
@@ -112,15 +112,17 @@
             </div>
 
             <div class="form-group">
-                <label style="align-self: center; font-weight: bold; color: #66fcf1;">賽車款式：</label>
+                <label style="align-self: center; font-weight: bold; color: #66fcf1;">載具款式：</label>
                 <select id="car-style">
-                    <option value="classic">🏎️ 經典超跑</option>
-                    <option value="cyber">⚡ 概念極速車</option>
-                    <option value="armored">🛡️ 裝甲賽車</option>
+                    <option value="bus">🚌 黃色校車</option>
+                    <option value="rocket">🚀 太空火箭</option>
+                    <option value="police">🚓 酷炫警車</option>
+                    <option value="f1">🏎️ F1 極速賽車</option>
                 </select>
 
                 <label style="align-self: center; font-weight: bold; color: #66fcf1; margin-left: 10px;">車身顏色：</label>
                 <select id="car-color">
+                    <option value="#f1c40f">💛 活力黃</option>
                     <option value="#ff4757">❤️ 經典紅</option>
                     <option value="#1e90ff">💙 炫光藍</option>
                     <option value="#2ed573">💚 疾速綠</option>
@@ -132,7 +134,7 @@
             <div id="loading-text" style="color: #66fcf1; margin-top: 10px;"></div>
         </div>
 
-        <!-- 英雄榜與管理頁面 -->
+        <!-- 英雄榜頁面 -->
         <div id="end-overlay" class="overlay" style="display: none;">
             <h2 id="end-title" style="font-size: 30px; margin: 0 0 5px 0; color: #ff007f; text-shadow: 0 0 10px rgba(255, 0, 127, 0.5);">🎉 挑戰結束！</h2>
             <p id="final-score-text" style="font-size: 22px; margin-bottom: 10px; color: #66fcf1;"></p>
@@ -161,14 +163,14 @@
         let model = null, video = null;
 
         let studentInfo = { name: "", class: "", date: "" };
-        let selectedCarColor = "#ff4757";
-        let selectedCarStyle = "classic";
+        let selectedCarColor = "#f1c40f";
+        let selectedCarStyle = "bus";
 
         let score = 0, timeLeft = 60, gameActive = false, isCalibrated = false;
-        let comboCount = 0; // 連擊計數器
-        let particles = []; // 答對粒子系統
-        let floatingTexts = []; // 浮空文字特效
-        let helperHint = ""; // 錯題提示
+        let comboCount = 0;
+        let particles = [];
+        let floatingTexts = [];
+        let helperHint = "";
 
         let isAdminMode = false;
         let currentLane = 1;
@@ -176,12 +178,12 @@
 
         let currentProblem = { question: "", options: [], correctLane: 1, tip: "" };
         let obstacleY = -60, obstacleSpeed = 3.2;
-        let roadOffset = 0;
+        let roadOffset = 0, tickCount = 0;
         let statusMsg = "請面向鏡頭正中間進行校準...";
         let baseCenterX = null;
         const sensitivityThreshold = 18;
 
-        // 🔊 音效系統 (強化版和弦)
+        // 音效系統
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -191,8 +193,8 @@
             if (!audioCtx) return;
             const now = audioCtx.currentTime;
 
-            if (type === 'correct') { // 強化版 C6 -> E6 -> G6 和弦歡慶音
-                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            if (type === 'correct') {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
                 notes.forEach((freq, idx) => {
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
@@ -200,10 +202,8 @@
                     osc.frequency.setValueAtTime(freq, now + idx * 0.05);
                     gain.gain.setValueAtTime(0.3, now + idx * 0.05);
                     gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.25);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(now + idx * 0.05);
-                    osc.stop(now + idx * 0.05 + 0.25);
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.05); osc.stop(now + idx * 0.05 + 0.25);
                 });
             } else if (type === 'wrong') {
                 const osc = audioCtx.createOscillator();
@@ -249,7 +249,6 @@
             }
         }
 
-        // ✨ 建立答對金色爆炸粒子
         function createExplosion(x, y) {
             for (let i = 0; i < 25; i++) {
                 particles.push({
@@ -257,13 +256,11 @@
                     vx: (Math.random() - 0.5) * 10,
                     vy: (Math.random() - 0.5) * 10 - 3,
                     color: ['#ffda79', '#66fcf1', '#ff4757', '#ffffff'][Math.floor(Math.random() * 4)],
-                    size: Math.random() * 6 + 3,
-                    alpha: 1.0
+                    size: Math.random() * 6 + 3, alpha: 1.0
                 });
             }
         }
 
-        // 浮空動態文字 (Combo / +10 分)
         function addFloatingText(x, y, text, color) {
             floatingTexts.push({ x: x, y: y, text: text, color: color, alpha: 1.0, vy: -2 });
         }
@@ -312,10 +309,8 @@
             }
 
             currentProblem = { 
-                question: questionText, 
-                options: options, 
-                correctLane: correctLane,
-                tip: `${target.frac} ＝ ${target.dec}`
+                question: questionText, options: options, 
+                correctLane: correctLane, tip: `${target.frac} ＝ ${target.dec}`
             };
             obstacleY = -60;
         }
@@ -416,10 +411,18 @@
             else requestAnimationFrame(detectPoseLoop);
         }
 
+        // 🎨 畫炫彩答案格與裝飾金幣/箭頭
         function drawOptionBlock(x, y, text) {
             const w = 140, h = 55, r = 12;
             ctx.save();
             ctx.translate(x - w / 2, y);
+
+            // 邊緣旋轉金幣飾品
+            ctx.fillStyle = "#ffda79";
+            ctx.beginPath();
+            ctx.arc(-15, h / 2, 8, 0, Math.PI * 2);
+            ctx.arc(w + 15, h / 2, 8, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.shadowColor = "#66fcf1";
             ctx.shadowBlur = 12;
@@ -441,12 +444,6 @@
             ctx.lineWidth = 3;
             ctx.stroke();
 
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(r, 3); ctx.lineTo(w - r, 3);
-            ctx.stroke();
-
             ctx.shadowBlur = 0;
 
             ctx.font = "bold 26px Arial, sans-serif";
@@ -462,54 +459,107 @@
             ctx.restore();
         }
 
-        function drawCar(x, y, color, style) {
+        // 🏎️/🚌/🚀/🚓 趣味主題載具繪製引擎
+        function drawVehicle(x, y, color, style) {
             ctx.save();
             ctx.translate(x, y);
 
+            tickCount++;
+
+            // 陰影
             ctx.fillStyle = "rgba(0,0,0,0.4)";
             ctx.beginPath();
             ctx.ellipse(0, 15, 32, 48, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.fillStyle = "#111";
-            ctx.fillRect(-28, -30, 8, 16);
-            ctx.fillRect(20, -30, 8, 16);
-            ctx.fillRect(-28, 15, 8, 18);
-            ctx.fillRect(20, 15, 8, 18);
+            if (style === 'bus') { // 🚌 黃色校車
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.roundRect(-24, -45, 48, 85, 8); ctx.fill();
 
-            const carGrad = ctx.createLinearGradient(-20, 0, 20, 0);
-            carGrad.addColorStop(0, color);
-            carGrad.addColorStop(0.5, "#ffffff");
-            carGrad.addColorStop(1, color);
-            ctx.fillStyle = carGrad;
+                // 車頂與窗戶
+                ctx.fillStyle = "#111";
+                ctx.fillRect(-20, -35, 40, 12); // 前擋風玻璃
+                ctx.fillRect(-20, -15, 3, 40);  // 側窗
+                ctx.fillRect(17, -15, 3, 40);
 
-            ctx.beginPath();
-            if (style === 'cyber') {
-                ctx.moveTo(0, -45); ctx.lineTo(24, -10); ctx.lineTo(20, 35); ctx.lineTo(-20, 35); ctx.lineTo(-24, -10);
-            } else if (style === 'armored') {
-                ctx.moveTo(0, -35); ctx.lineTo(26, -20); ctx.lineTo(26, 35); ctx.lineTo(-26, 35); ctx.lineTo(-26, -20);
-            } else {
-                ctx.moveTo(0, -40); ctx.lineTo(22, -15); ctx.lineTo(22, 35); ctx.lineTo(-22, 35); ctx.lineTo(-22, -15);
+                // 校車黑條與標誌
+                ctx.fillStyle = "#000";
+                ctx.fillRect(-24, -5, 48, 6);
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 10px Arial"; ctx.textAlign = "center";
+                ctx.fillText("SCHOOL BUS", 0, 0);
+
+                // 閃爍校車燈
+                ctx.fillStyle = (tickCount % 20 < 10) ? "#ff4757" : "#1e90ff";
+                ctx.beginPath();
+                ctx.arc(-16, -42, 4, 0, Math.PI * 2);
+                ctx.arc(16, -42, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else if (style === 'rocket') { // 🚀 太空火箭
+                // 噴射火焰動畫
+                const fireH = Math.random() * 20 + 20;
+                const fireGrad = ctx.createLinearGradient(0, 35, 0, 35 + fireH);
+                fireGrad.addColorStop(0, "#ffda79");
+                fireGrad.addColorStop(0.5, "#ff4757");
+                fireGrad.addColorStop(1, "transparent");
+                ctx.fillStyle = fireGrad;
+                ctx.beginPath();
+                ctx.moveTo(-12, 35); ctx.lineTo(0, 35 + fireH); ctx.lineTo(12, 35);
+                ctx.fill();
+
+                // 火箭主體
+                ctx.fillStyle = "#e0e0e0";
+                ctx.beginPath();
+                ctx.moveTo(0, -50); ctx.lineTo(18, -10); ctx.lineTo(18, 35); ctx.lineTo(-18, 35); ctx.lineTo(-18, -10);
+                ctx.closePath(); ctx.fill();
+
+                // 彈頭顏色
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(18, -10); ctx.lineTo(-18, -10); ctx.closePath(); ctx.fill();
+
+                // 機翼
+                ctx.fillStyle = color;
+                ctx.fillRect(-26, 15, 8, 20); ctx.fillRect(18, 15, 8, 20);
+
+                // 圓形舷窗
+                ctx.fillStyle = "#66fcf1"; ctx.strokeStyle = "#222"; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(0, 5, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            } else if (style === 'police') { // 🚓 酷炫警車
+                ctx.fillStyle = "#111"; // 黑白警車車身
+                ctx.beginPath(); ctx.roundRect(-22, -40, 44, 80, 10); ctx.fill();
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(-22, -15, 44, 30); // 中間白色
+
+                // 警車頭與車窗
+                ctx.fillStyle = "#222"; ctx.fillRect(-18, -30, 36, 12);
+
+                // 動態警燈 (紅藍交替閃爍)
+                const isRedLeft = Math.floor(tickCount / 10) % 2 === 0;
+                ctx.fillStyle = isRedLeft ? "#ff4757" : "#1e90ff"; ctx.fillRect(-12, -8, 10, 5);
+                ctx.fillStyle = isRedLeft ? "#1e90ff" : "#ff4757"; ctx.fillRect(2, -8, 10, 5);
+
+                // POLICE 文字
+                ctx.fillStyle = "#ffffff"; ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
+                ctx.fillText("POLICE", 0, 4);
+
+            } else { // 🏎️ F1 極速賽車
+                ctx.fillStyle = "#111";
+                ctx.fillRect(-30, -25, 10, 18); ctx.fillRect(20, -25, 10, 18); // 超寬後輪
+                ctx.fillRect(-30, 15, 10, 20); ctx.fillRect(20, 15, 10, 20);
+
+                const carGrad = ctx.createLinearGradient(-20, 0, 20, 0);
+                carGrad.addColorStop(0, color); carGrad.addColorStop(0.5, "#ffffff"); carGrad.addColorStop(1, color);
+                ctx.fillStyle = carGrad;
+
+                ctx.beginPath();
+                ctx.moveTo(0, -48); ctx.lineTo(16, -10); ctx.lineTo(14, 35); ctx.lineTo(-14, 35); ctx.lineTo(-16, -10);
+                ctx.closePath(); ctx.fill();
+
+                // F1 大尾翼
+                ctx.fillStyle = "#222"; ctx.fillRect(-26, 32, 52, 8);
             }
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = "#0b0c10";
-            ctx.beginPath();
-            ctx.moveTo(-12, -10); ctx.lineTo(12, -10); ctx.lineTo(15, 5); ctx.lineTo(-15, 5);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = "#ffda79";
-            ctx.shadowColor = "#ffda79"; ctx.shadowBlur = 8;
-            ctx.beginPath();
-            ctx.arc(-14, -35, 4, 0, Math.PI * 2);
-            ctx.arc(14, -35, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-
-            ctx.fillStyle = "#222";
-            ctx.fillRect(-22, 32, 44, 6);
 
             ctx.restore();
         }
@@ -518,6 +568,7 @@
             ctx.fillStyle = "#0b0c10";
             ctx.fillRect(0, 0, 800, 600);
 
+            // 動態跑道與條紋
             roadOffset = (roadOffset + obstacleSpeed) % 40;
             ctx.strokeStyle = "rgba(102, 252, 241, 0.15)";
             ctx.lineWidth = 2;
@@ -530,8 +581,7 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            ctx.strokeStyle = "#45a29e";
-            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#45a29e"; ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(10, 0); ctx.lineTo(10, 600);
             ctx.moveTo(790, 0); ctx.lineTo(790, 600);
@@ -541,16 +591,13 @@
                 ctx.fillStyle = "rgba(11, 12, 16, 0.7)";
                 ctx.fillRect(0, 0, 800, 600);
 
-                ctx.fillStyle = "#66fcf1";
-                ctx.font = "bold 32px Arial";
-                ctx.textAlign = "center";
+                ctx.fillStyle = "#66fcf1"; ctx.font = "bold 32px Arial"; ctx.textAlign = "center";
                 ctx.fillText("🎯 正在校準頭部正中心...", 400, 260);
-                ctx.font = "20px Arial";
-                ctx.fillStyle = "#c5c6c7";
+                ctx.font = "20px Arial"; ctx.fillStyle = "#c5c6c7";
                 ctx.fillText("請面向螢幕正中間保持不動", 400, 310);
 
                 const carX = laneXPositions[currentLane];
-                drawCar(carX, 490, selectedCarColor, selectedCarStyle);
+                drawVehicle(carX, 490, selectedCarColor, selectedCarStyle);
                 requestAnimationFrame(gameLoop);
                 return;
             }
@@ -564,7 +611,6 @@
 
                 const carX = laneXPositions[currentLane];
 
-                // 碰撞與得分
                 if (obstacleY >= 440 && obstacleY <= 490) {
                     if (currentLane === currentProblem.correctLane) {
                         comboCount++;
@@ -572,7 +618,7 @@
                         score += bonusScore;
                         
                         playSound('correct');
-                        createExplosion(carX, 470); // 噴發粒子
+                        createExplosion(carX, 470);
                         
                         if (comboCount > 1) {
                             addFloatingText(carX, 430, `🔥 ${comboCount} COMBO! +${bonusScore}`, "#ffda79");
@@ -580,15 +626,14 @@
                             addFloatingText(carX, 430, `+10`, "#66fcf1");
                         }
 
-                        helperHint = ""; // 清空提示
+                        helperHint = "";
                         generateProblem();
                     } else {
-                        comboCount = 0; // 重置 Combo
+                        comboCount = 0;
                         score = Math.max(0, score - 5);
                         playSound('wrong');
                         addFloatingText(carX, 430, `-5`, "#ff4757");
 
-                        // 顯示學習複習提示
                         helperHint = `💡 複習小提示：${currentProblem.tip}`;
                         obstacleY = -60;
                     }
@@ -596,60 +641,45 @@
                     obstacleY = -60;
                 }
 
-                // 畫賽車
-                drawCar(carX, 490, selectedCarColor, selectedCarStyle);
+                drawVehicle(carX, 490, selectedCarColor, selectedCarStyle);
 
-                // 渲染粒子特效
+                // 粒子動畫
                 for (let i = particles.length - 1; i >= 0; i--) {
                     let p = particles[i];
                     p.x += p.vx; p.y += p.vy; p.alpha -= 0.03;
                     if (p.alpha <= 0) particles.splice(i, 1);
                     else {
-                        ctx.fillStyle = p.color;
-                        ctx.globalAlpha = p.alpha;
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                        ctx.fill();
+                        ctx.fillStyle = p.color; ctx.globalAlpha = p.alpha;
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
                         ctx.globalAlpha = 1.0;
                     }
                 }
 
-                // 渲染浮空文字
+                // 浮空文字
                 for (let i = floatingTexts.length - 1; i >= 0; i--) {
                     let ft = floatingTexts[i];
                     ft.y += ft.vy; ft.alpha -= 0.02;
                     if (ft.alpha <= 0) floatingTexts.splice(i, 1);
                     else {
-                        ctx.font = "bold 24px Arial";
-                        ctx.fillStyle = ft.color;
-                        ctx.globalAlpha = ft.alpha;
-                        ctx.textAlign = "center";
-                        ctx.fillText(ft.text, ft.x, ft.y);
+                        ctx.font = "bold 24px Arial"; ctx.fillStyle = ft.color; ctx.globalAlpha = ft.alpha;
+                        ctx.textAlign = "center"; ctx.fillText(ft.text, ft.x, ft.y);
                         ctx.globalAlpha = 1.0;
                     }
                 }
 
-                // 頂部 HUD 面板
+                // 頂部科技 HUD
                 ctx.fillStyle = "rgba(31, 40, 51, 0.85)";
-                ctx.beginPath();
-                ctx.roundRect(150, 10, 500, 75, 12);
-                ctx.fill();
+                ctx.beginPath(); ctx.roundRect(150, 10, 500, 75, 12); ctx.fill();
                 ctx.strokeStyle = "#66fcf1"; ctx.lineWidth = 1.5; ctx.stroke();
 
-                ctx.fillStyle = "#66fcf1";
-                ctx.font = "bold 26px Arial";
-                ctx.textAlign = "center";
+                ctx.fillStyle = "#66fcf1"; ctx.font = "bold 26px Arial"; ctx.textAlign = "center";
                 ctx.fillText(`題目：${currentProblem.question}`, 400, 42);
 
-                // 顯示學習小提示或狀態
                 ctx.font = "14px Arial";
                 ctx.fillStyle = helperHint ? "#ffda79" : "#c5c6c7";
                 ctx.fillText(helperHint || statusMsg, 400, 70);
 
-                // 左上方面板 (得分/時間/連擊)
-                ctx.font = "bold 18px Arial";
-                ctx.fillStyle = "#ffffff";
-                ctx.textAlign = "left";
+                ctx.font = "bold 18px Arial"; ctx.fillStyle = "#ffffff"; ctx.textAlign = "left";
                 ctx.fillText(`得分: ${score}`, 25, 35);
                 ctx.fillText(`時間: ${timeLeft}s`, 25, 65);
                 ctx.fillText(`學生: ${studentInfo.class} ${studentInfo.name}`, 25, 95);
