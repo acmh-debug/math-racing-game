@@ -618,8 +618,8 @@
 
         // ⚙️ 老師管理專區
         function openTeacherPanel() {
-            const pwd = prompt("請輸入老師管理密碼 (預設: 9878):");
-            if (pwd === "1234") {
+            const pwd = prompt("請輸入老師管理密碼 :");
+            if (pwd === "9878") {
                 isAdminMode = true;
                 document.getElementById('end-title').innerText = "⚙️ 排行榜老師管理後台";
                 document.getElementById('final-score-text').innerText = "提示：您可以在此修改學生姓名、班別、分數，或刪除單筆紀錄。";
