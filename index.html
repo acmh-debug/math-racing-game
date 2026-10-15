@@ -3,19 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>數學校園體感賽車</title>
-    <!-- 引入穩定的 TF.js 與 Pose-Detection 函式庫 -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@3.18.0/dist/tf-core.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@3.18.0/dist/tf-converter.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@3.18.0/dist/tf-backend-webgl.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0/dist/pose-detection.min.js"></script>
+    <title>數學校園體感賽車（BlazeFace 終極修復版）</title>
+    <!-- 引入穩定的 BlazeFace 人臉偵測模型與 TF.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
             margin: 0;
             padding: 0;
             background-color: #1a1a2e;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
             color: white;
             display: flex;
             flex-direction: column;
@@ -25,26 +23,36 @@
             overflow: hidden;
         }
 
+        /* 專為 Google Sites 內嵌設計的警告跳轉條 */
         #iframe-warning {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            background: #ff4757;
+            background: linear-gradient(90deg, #ff416c, #ff4b2b);
             color: white;
             text-align: center;
-            padding: 10px;
+            padding: 12px 10px;
+            font-size: 16px;
             font-weight: bold;
             z-index: 9999;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
+
         #iframe-warning a {
-            color: #1e90ff;
-            background: white;
-            padding: 4px 10px;
-            border-radius: 4px;
-            margin-left: 10px;
+            background-color: #ffffff;
+            color: #ff416c;
+            padding: 6px 16px;
+            margin-left: 12px;
+            border-radius: 20px;
             text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        #iframe-warning a:hover {
+            transform: scale(1.05);
         }
 
         #game-container {
@@ -80,7 +88,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1);
+            transform: scaleX(-1); /* 鏡像翻轉 */
         }
 
         #status-text {
@@ -88,10 +96,12 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: #eccc68;
             pointer-events: none;
+            text-align: center;
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -105,9 +115,13 @@
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="webcam-container">
+            <!-- 加入 playsinline, autoplay, muted 確保 iOS / iPad 相容 -->
             <video id="webcam" autoplay playsinline muted></video>
         </div>
-        <div id="status-text">載入AI體感模型中，請稍候...</div>
+        <div id="status-text">
+            <span>載入 AI 體感模型中...</span><br>
+            <span style="font-size: 16px; color: #a4b0be; font-weight: normal;">（請稍候數秒）</span>
+        </div>
     </div>
 
     <script>
@@ -119,84 +133,93 @@
         const ctx = canvas.getContext('2d');
         const statusText = document.getElementById('status-text');
 
-        let detector;
+        let model;
         let video;
 
-        // 畫畫測試圖案（驗證 Canvas 運作）
+        // 畫畫初始背景（驗證 Canvas 運作）
         function renderBackground() {
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // 畫出跑道測試線
-            ctx.strokeStyle = "#eccc68";
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.moveTo(200, 0); ctx.lineTo(200, 600);
-            ctx.moveTo(600, 0); ctx.lineTo(600, 600);
-            ctx.stroke();
-
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "30px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText("賽車準備中...", 400, 300);
         }
 
+        // 初始化攝影機
         async function setupCamera() {
             video = document.getElementById('webcam');
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 320, height: 240, facingMode: 'user' },
-                audio: false
-            });
-            video.srcObject = stream;
-            return new Promise((resolve) => {
-                video.onloadedmetadata = () => {
-                    video.play();
-                    resolve(video);
-                };
-            });
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 320, height: 240, facingMode: 'user' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve(video);
+                    };
+                });
+            } catch (err) {
+                console.error("無法讀取攝影機: ", err);
+                statusText.innerHTML = `<span style="color: #ff4757;">⚠️ 無法存取攝影機！</span><br><span style="font-size: 16px; color: #a4b0be; font-weight: normal;">請確認瀏覽器權限已開啟。</span>`;
+                throw err;
+            }
         }
 
+        // 初始化 AI 模型
         async function initAI() {
             try {
-                renderBackground();
-                await setupCamera();
+                renderBackground(); // 先畫藍底
+                await setupCamera(); // 先啟動鏡頭（你的截圖顯示這步成功了）
                 
-                // 初始化 MoveNet AI 模型
-                const detectorConfig = { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING };
-                detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig);
+                // 使用更穩定的 BlazeFace 人臉模型
+                console.log("正在載入 BlazeFace 模型...");
+                model = await blazeface.load();
+                console.log("BlazeFace 模型載入成功！");
                 
                 statusText.style.display = "none";
                 detectPose();
             } catch (err) {
-                console.error(err);
-                statusText.innerText = "載入失敗，請重新整理頁面！";
-                statusText.style.color = "#ff4757";
+                console.error("模型載入失敗：", err);
+                statusText.innerHTML = `<span style="color: #ff4757;">⚠️ 模型載入失敗！</span><br><span style="font-size: 16px; color: #a4b0be; font-weight: normal;">（請嘗試重新整理頁面）<br>錯誤原因: ${err.message}</span>`;
             }
         }
 
         async function detectPose() {
-            if (detector && video) {
-                const poses = await detector.estimatePoses(video);
-                
-                // 清空並重繪畫面
-                renderBackground();
+            if (model && video) {
+                renderBackground(); // 每一幀都重繪藍底
 
-                if (poses.length > 0) {
-                    const nose = poses[0].keypoints.find(k => k.name === 'nose');
-                    if (nose && nose.score > 0.3) {
+                // 估計臉部位置
+                const predictions = await model.estimateFaces(video, false);
+
+                if (predictions.length > 0) {
+                    const face = predictions[0];
+                    const leftEye = face.landmarks[0]; // 左眼關鍵點
+                    
+                    if (leftEye) {
                         // 畫出頭部追蹤紅點 (因鏡像要反轉 X)
-                        const targetX = 800 - (nose.x * (800 / video.videoWidth));
-                        const targetY = nose.y * (600 / video.videoHeight);
+                        const targetX = 800 - (leftEye[0] * (800 / video.videoWidth));
+                        const targetY = leftEye[1] * (600 / video.videoHeight);
 
+                        // 畫頭部鎖定紅點
                         ctx.fillStyle = "#ff4757";
                         ctx.beginPath();
                         ctx.arc(targetX, targetY, 20, 0, 2 * Math.PI);
                         ctx.fill();
+                        
+                        // 畫一個簡單測試線，顯示左右移動即可控制
+                        ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+                        ctx.fillRect(400, 0, 1, 600); // 中央中線
 
                         ctx.fillStyle = "#ffffff";
-                        ctx.font = "20px Arial";
-                        ctx.fillText("頭部已鎖定！頭部左右移動即可控制", 400, 100);
+                        ctx.font = "20px Segoe UI";
+                        ctx.textAlign = "center";
+                        ctx.fillText("頭部已鎖定！控制紅點移動至跑道中央", 400, 100);
                     }
+                } else {
+                    // 沒偵測到臉，顯示提示
+                    ctx.fillStyle = "#ffffff";
+                    ctx.font = "24px Segoe UI";
+                    ctx.textAlign = "center";
+                    ctx.fillText("請面向鏡頭，正在搜尋您的頭部...", 400, 300);
                 }
             }
             requestAnimationFrame(detectPose);
