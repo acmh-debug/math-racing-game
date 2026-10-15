@@ -34,7 +34,6 @@
         }
         #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         
-        /* 啟動按鈕蓋頁 */
         #start-overlay {
             position: absolute; top: 0; left: 0;
             width: 800px; height: 600px;
@@ -52,7 +51,7 @@
             transition: transform 0.2s;
         }
         #start-btn:hover { transform: scale(1.05); }
-        #loading-text { font-size: 20px; color: #eccc68; margin-top: 15px; }
+        #loading-text { font-size: 18px; color: #eccc68; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -74,18 +73,20 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let model, video;
+        let model = null;
+        let video = null;
 
         // 遊戲核心變數
         let score = 0;
         let timeLeft = 60;
         let gameActive = false;
         let currentLane = 1; // 0: 左, 1: 中, 2: 右
-        const laneXPositions = [133, 400, 666]; // 跑道中心點坐標
+        const laneXPositions = [133, 400, 666];
 
         let currentProblem = { question: "", options: [0, 0, 0], correctLane: 1 };
         let obstacleY = -50;
         let obstacleSpeed = 3.5;
+        let statusMsg = "AI 體感載入中...";
 
         // 產生隨機加減法題目
         function generateProblem() {
@@ -115,13 +116,26 @@
         }
 
         async function startGame() {
-            const btn = document.getElementById('start-btn');
-            const loadingText = document.getElementById('loading-text');
-            btn.style.display = 'none';
-            loadingText.innerText = '正在連線鏡頭並載入 AI 模型...';
+            document.getElementById('start-overlay').style.display = 'none';
 
+            generateProblem();
+            gameActive = true;
+
+            // 1. 立即啟動遊戲渲染主迴圈，確保畫面絕對不會卡死
+            requestAnimationFrame(gameLoop);
+
+            // 倒數計時器
+            const timer = setInterval(() => {
+                if (gameActive && timeLeft > 0) {
+                    timeLeft--;
+                } else if (timeLeft === 0) {
+                    gameActive = false;
+                    clearInterval(timer);
+                }
+            }, 1000);
+
+            // 2. 背景非同步啟動鏡頭與載入 AI 模型
             try {
-                // 1. 啟動鏡頭
                 video = document.getElementById('webcam');
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 320, height: 240, facingMode: 'user' }, audio: false
@@ -130,35 +144,45 @@
                 await new Promise(r => video.onloadedmetadata = r);
                 video.play();
 
-                // 2. 載入模型
+                statusMsg = "載入 AI 體感模型中...";
                 model = await blazeface.load();
-
-                // 3. 隱藏蓋頁，進入遊戲
-                document.getElementById('start-overlay').style.display = 'none';
-                generateProblem();
-                gameActive = true;
-
-                // 倒數計時器
-                const timer = setInterval(() => {
-                    if (gameActive && timeLeft > 0) {
-                        timeLeft--;
-                    } else if (timeLeft === 0) {
-                        gameActive = false;
-                        clearInterval(timer);
-                    }
-                }, 1000);
-
-                requestAnimationFrame(gameLoop);
-
+                statusMsg = "體感控制已就緒！";
+                
+                // 背景啟動 AI 偵測迴圈
+                detectPoseLoop();
             } catch (err) {
-                console.error(err);
-                loadingText.innerText = '⚠️ 啟動失敗: ' + err.message;
-                loadingText.style.color = '#ff4757';
-                btn.style.display = 'inline-block';
+                console.error("鏡頭/AI 載入異常: ", err);
+                statusMsg = "⚠️ 體感無效（可以使用方向鍵 ← → 操作）";
+                
+                // 備用鍵盤操作機制
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
+                    if (e.key === 'ArrowRight') currentLane = Math.min(2, currentLane + 1);
+                });
             }
         }
 
-        async function gameLoop() {
+        async function detectPoseLoop() {
+            if (model && video && video.readyState >= 2) {
+                try {
+                    const predictions = await model.estimateFaces(video, false, false, 0.3);
+                    if (predictions.length > 0) {
+                        const face = predictions[0];
+                        const centerX = (face.topLeft[0] + face.bottomRight[0]) / 2;
+                        const targetX = 800 - (centerX * (800 / video.videoWidth));
+
+                        if (targetX < 266) currentLane = 0;
+                        else if (targetX > 533) currentLane = 2;
+                        else currentLane = 1;
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+            if (gameActive) requestAnimationFrame(detectPoseLoop);
+        }
+
+        function gameLoop() {
             // 背景與跑道
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
@@ -169,21 +193,6 @@
             ctx.moveTo(266, 0); ctx.lineTo(266, 600);
             ctx.moveTo(533, 0); ctx.lineTo(533, 600);
             ctx.stroke();
-
-            // 體感鏡頭追蹤
-            if (model && video && video.readyState >= 2) {
-                const predictions = await model.estimateFaces(video, false, false, 0.3);
-                if (predictions.length > 0) {
-                    const face = predictions[0];
-                    const centerX = (face.topLeft[0] + face.bottomRight[0]) / 2;
-                    const targetX = 800 - (centerX * (800 / video.videoWidth));
-
-                    // 切換跑道
-                    if (targetX < 266) currentLane = 0;
-                    else if (targetX > 533) currentLane = 2;
-                    else currentLane = 1;
-                }
-            }
 
             if (gameActive) {
                 // 題目算式障礙物下落
@@ -227,7 +236,12 @@
                 ctx.textAlign = "center";
                 ctx.fillText(`題目：${currentProblem.question}`, 400, 45);
 
+                ctx.font = "16px Arial";
+                ctx.fillStyle = "#eccc68";
+                ctx.fillText(statusMsg, 400, 75);
+
                 ctx.font = "bold 20px Arial";
+                ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "left";
                 ctx.fillText(`得分: ${score}`, 30, 40);
                 ctx.fillText(`時間: ${timeLeft}s`, 30, 70);
