@@ -2,16 +2,16 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>數學校園體感賽車 - 校準強化版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小六分數小數互化體感賽車</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; touch-action: manipulation; }
         body {
             margin: 0; padding: 0;
             background-color: #1a1a2e;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: white;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
@@ -34,32 +34,47 @@
         }
         #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         
-        #start-overlay {
+        /* 彈窗蓋頁 */
+        .overlay {
             position: absolute; top: 0; left: 0;
             width: 800px; height: 600px;
-            background: rgba(15, 52, 96, 0.95);
+            background: rgba(15, 52, 96, 0.96);
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             z-index: 20;
+            padding: 20px;
         }
-        #start-btn {
-            background: #ff4757;
-            color: white; border: none;
-            padding: 15px 40px; font-size: 24px; font-weight: bold;
+        .form-group {
+            display: flex; gap: 10px; margin-bottom: 20px;
+        }
+        input, select {
+            padding: 10px 15px; font-size: 18px; border-radius: 8px;
+            border: 2px solid #1e90ff; background: #16213e; color: white;
+            outline: none; text-align: center;
+        }
+        .btn {
+            background: #ff4757; color: white; border: none;
+            padding: 12px 35px; font-size: 22px; font-weight: bold;
             border-radius: 30px; cursor: pointer;
             box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
             transition: transform 0.2s;
         }
-        #start-btn:hover { transform: scale(1.05); }
-        #loading-text { font-size: 18px; color: #eccc68; margin-top: 15px; }
+        .btn:active { transform: scale(0.95); }
+        
+        /* 排行榜表格 */
+        table {
+            width: 90%; border-collapse: collapse; margin-top: 15px;
+            background: #16213e; border-radius: 8px; overflow: hidden;
+        }
+        th, td {
+            padding: 10px; text-align: center; border-bottom: 1px solid #0f3460;
+        }
+        th { background: #1e90ff; color: white; }
 
-        /* 校準按鈕 */
         #recalibrate-btn {
-            position: absolute;
-            bottom: 15px; right: 15px;
-            background: #1e90ff; color: white;
-            border: none; padding: 8px 15px;
-            border-radius: 20px; font-weight: bold;
+            position: absolute; bottom: 15px; right: 15px;
+            background: #1e90ff; color: white; border: none;
+            padding: 8px 15px; border-radius: 20px; font-weight: bold;
             cursor: pointer; z-index: 15;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
@@ -72,13 +87,36 @@
         <div id="webcam-container">
             <video id="webcam" autoplay playsinline muted></video>
         </div>
-        <button id="recalibrate-btn" onclick="recalibrateCenter()">🎯 重新校準頭部正中心</button>
+        <button id="recalibrate-btn" onclick="recalibrateCenter()">🎯 校準頭部位置</button>
 
-        <div id="start-overlay">
-            <h1 style="font-size: 36px; margin-bottom: 10px;">🏎️ 數學校園體感賽車</h1>
-            <p style="color: #a4b0be; margin-bottom: 30px;">透過頭部左右微傾切換跑道，選擇正確答案！</p>
-            <button id="start-btn" onclick="startGame()">點擊開始遊戲 🚀</button>
-            <div id="loading-text"></div>
+        <!-- 開始與學生資訊輸入頁面 -->
+        <div id="start-overlay" class="overlay">
+            <h1 style="font-size: 32px; margin-bottom: 5px; color: #eccc68;">🏎️ 小六分數小數互化賽車</h1>
+            <p style="color: #a4b0be; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜iPad 體感優化版</p>
+            
+            <div class="form-group">
+                <input type="text" id="student-class" placeholder="班別 (如: 6A)" style="width: 130px;">
+                <input type="text" id="student-name" placeholder="學生姓名" style="width: 160px;">
+            </div>
+
+            <button class="btn" onclick="startGame()">點擊開始挑戰 🚀</button>
+            <div id="loading-text" style="color: #eccc68; margin-top: 15px;"></div>
+        </div>
+
+        <!-- 排行榜與結束結算頁面 -->
+        <div id="end-overlay" class="overlay" style="display: none;">
+            <h2 style="font-size: 32px; margin: 0 0 10px 0; color: #ff4757;">🎉 挑戰結束！</h2>
+            <p id="final-score-text" style="font-size: 24px; margin-bottom: 15px;"></p>
+            
+            <h3 style="margin: 5px 0; color: #eccc68;">🏆 班級英雄榜 (Top 5)</h3>
+            <table id="leaderboard-table">
+                <thead>
+                    <tr><th>名次</th><th>日期</th><th>班別</th><th>姓名</th><th>得分</th></tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+            </table>
+
+            <button class="btn" onclick="restartGame()" style="margin-top: 20px;">再次挑戰 🔄</button>
         </div>
     </div>
 
@@ -88,45 +126,67 @@
         let model = null;
         let video = null;
 
-        // 遊戲核心變數
+        // 學生資料與遊戲變數
+        let studentInfo = { name: "", class: "", date: "" };
         let score = 0;
         let timeLeft = 60;
         let gameActive = false;
         let currentLane = 1; // 0: 左, 1: 中, 2: 右
         const laneXPositions = [133, 400, 666];
 
-        let currentProblem = { question: "", options: [0, 0, 0], correctLane: 1 };
+        let currentProblem = { question: "", options: [], correctLane: 1 };
         let obstacleY = -50;
-        let obstacleSpeed = 3.5;
+        let obstacleSpeed = 3.2;
         let statusMsg = "AI 體感載入中...";
 
-        // 體感中心基準點與閥值
         let baseCenterX = null;
-        const sensitivityThreshold = 18; // 傾斜切換車道的像素門檻 (可調大小)
+        const sensitivityThreshold = 18;
+
+        // 小六常用分數 (分母 2, 4, 5, 8) 與對應小數庫
+        const fractionData = [
+            // 分母 2
+            { frac: "1/2", dec: "0.5" },
+            // 分母 4
+            { frac: "1/4", dec: "0.25" }, { frac: "3/4", dec: "0.75" },
+            // 分母 5
+            { frac: "1/5", dec: "0.2" }, { frac: "2/5", dec: "0.4" },
+            { frac: "3/5", dec: "0.6" }, { frac: "4/5", dec: "0.8" },
+            // 分母 8
+            { frac: "1/8", dec: "0.125" }, { frac: "3/8", dec: "0.375" },
+            { frac: "5/8", dec: "0.625" }, { frac: "7/8", dec: "0.875" }
+        ];
 
         function recalibrateCenter() {
-            baseCenterX = null; // 重置基準點，下一幀自動設為正中心
+            baseCenterX = null;
             statusMsg = "🎯 已重新校準頭部正中心！";
         }
 
+        // 產生分數小數互化題目
         function generateProblem() {
-            const a = Math.floor(Math.random() * 15) + 1;
-            const b = Math.floor(Math.random() * 15) + 1;
-            const isAddition = Math.random() > 0.5;
+            const isFracToDec = Math.random() > 0.5; // 50% 題目為「分數轉小數」，50% 為「小數轉分數」
+            const target = fractionData[Math.floor(Math.random() * fractionData.length)];
 
-            const questionText = isAddition ? `${a} + ${b} = ?` : `${Math.max(a, b)} - ${Math.min(a, b)} = ?`;
-            const correctAnswer = isAddition ? a + b : Math.max(a, b) - Math.min(a, b);
+            let questionText, correctAnswer;
+            if (isFracToDec) {
+                questionText = `${target.frac} = ?`;
+                correctAnswer = target.dec;
+            } else {
+                questionText = `${target.dec} = ?`;
+                correctAnswer = target.frac;
+            }
 
             const correctLane = Math.floor(Math.random() * 3);
-            const options = [0, 0, 0];
+            const options = ["", "", ""];
             options[correctLane] = correctAnswer;
 
+            // 產生干擾選項
             for (let i = 0; i < 3; i++) {
                 if (i !== correctLane) {
                     let fake;
                     do {
-                        fake = correctAnswer + (Math.floor(Math.random() * 9) - 4);
-                    } while (fake === correctAnswer || fake < 0 || options.includes(fake));
+                        const randomItem = fractionData[Math.floor(Math.random() * fractionData.length)];
+                        fake = isFracToDec ? randomItem.dec : randomItem.frac;
+                    } while (fake === correctAnswer || options.includes(fake));
                     options[i] = fake;
                 }
             }
@@ -136,8 +196,25 @@
         }
 
         async function startGame() {
+            const nameInput = document.getElementById('student-name').value.trim();
+            const classInput = document.getElementById('student-class').value.trim();
+
+            if (!nameInput || !classInput) {
+                alert("請先輸入『班別』與『學生姓名』！");
+                return;
+            }
+
+            const today = new Date();
+            studentInfo = {
+                name: nameInput,
+                class: classInput,
+                date: `${today.getMonth() + 1}/${today.getDate()}`
+            };
+
             document.getElementById('start-overlay').style.display = 'none';
 
+            score = 0;
+            timeLeft = 60;
             generateProblem();
             gameActive = true;
 
@@ -149,11 +226,13 @@
                 } else if (timeLeft === 0) {
                     gameActive = false;
                     clearInterval(timer);
+                    endGame();
                 }
             }, 1000);
 
             try {
                 video = document.getElementById('webcam');
+                // iPad Safari 鏡頭相容性設定
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 160, height: 120, facingMode: 'user' }, audio: false
                 });
@@ -161,15 +240,16 @@
                 await new Promise(r => video.onloadedmetadata = r);
                 video.play();
 
-                statusMsg = "載入模型中...";
+                statusMsg = "載入 AI 模型中...";
                 model = await blazeface.load();
                 statusMsg = "請保持頭部居中...";
                 
                 detectPoseLoop();
             } catch (err) {
                 console.error("鏡頭/AI 載入異常: ", err);
-                statusMsg = "⚠️ 體感無效（支援鍵盤 ← → 操作）";
+                statusMsg = "⚠️ 體感無效（可使用鍵盤 ← → 或點擊畫面左右側）";
                 
+                // iPad/電腦觸控與鍵盤支援
                 window.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowLeft') currentLane = Math.max(0, currentLane - 1);
                     if (e.key === 'ArrowRight') currentLane = Math.min(2, currentLane + 1);
@@ -185,21 +265,19 @@
                         const face = predictions[0];
                         const currentX = (face.topLeft[0] + face.bottomRight[0]) / 2;
 
-                        // 自動記錄開局前幾幀的平均座標作為中心點
                         if (baseCenterX === null) {
                             baseCenterX = currentX;
                             statusMsg = "✅ 正中心校準完成！";
                         }
 
-                        // 正確的鏡像左右位移計算
                         const deltaX = currentX - baseCenterX;
 
                         if (deltaX > sensitivityThreshold) {
-                            currentLane = 0; // 頭往左偏 (視訊畫面鏡像)
+                            currentLane = 0; // 頭往左偏
                         } else if (deltaX < -sensitivityThreshold) {
                             currentLane = 2; // 頭往右偏
                         } else {
-                            currentLane = 1; // 居中跑道
+                            currentLane = 1; // 居中
                         }
                     }
                 } catch (e) {
@@ -215,6 +293,7 @@
             ctx.fillStyle = "#0f3460";
             ctx.fillRect(0, 0, 800, 600);
 
+            // 賽車分隔線
             ctx.strokeStyle = "#eccc68";
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -227,14 +306,15 @@
 
                 for (let i = 0; i < 3; i++) {
                     ctx.fillStyle = "#1e90ff";
-                    ctx.fillRect(laneXPositions[i] - 50, obstacleY, 100, 50);
+                    ctx.fillRect(laneXPositions[i] - 65, obstacleY, 130, 50);
 
                     ctx.fillStyle = "#ffffff";
                     ctx.font = "bold 24px Arial";
                     ctx.textAlign = "center";
-                    ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 33);
+                    ctx.fillText(currentProblem.options[i], laneXPositions[i], obstacleY + 34);
                 }
 
+                // 碰撞檢測
                 if (obstacleY >= 450 && obstacleY <= 500) {
                     if (currentLane === currentProblem.correctLane) {
                         score += 10;
@@ -246,6 +326,7 @@
                     generateProblem();
                 }
 
+                // 畫賽車
                 const carX = laneXPositions[currentLane];
                 ctx.fillStyle = "#ff4757";
                 ctx.shadowColor = "#ff4757";
@@ -255,36 +336,70 @@
                 ctx.fill();
                 ctx.shadowBlur = 0;
 
+                // UI
                 ctx.fillStyle = "#ffffff";
                 ctx.font = "bold 28px Arial";
                 ctx.textAlign = "center";
                 ctx.fillText(`題目：${currentProblem.question}`, 400, 45);
 
-                ctx.font = "16px Arial";
+                ctx.font = "15px Arial";
                 ctx.fillStyle = "#eccc68";
                 ctx.fillText(statusMsg, 400, 75);
 
-                ctx.font = "bold 20px Arial";
+                ctx.font = "bold 18px Arial";
                 ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "left";
-                ctx.fillText(`得分: ${score}`, 30, 40);
-                ctx.fillText(`時間: ${timeLeft}s`, 30, 70);
+                ctx.fillText(`得分: ${score}`, 25, 35);
+                ctx.fillText(`時間: ${timeLeft}s`, 25, 65);
+                ctx.fillText(`學生: ${studentInfo.class} ${studentInfo.name}`, 25, 95);
 
                 requestAnimationFrame(gameLoop);
-            } else {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-                ctx.fillRect(0, 0, 800, 600);
-
-                ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 40px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText("🎉 挑戰結束！", 400, 240);
-                ctx.fillText(`最終得分：${score} 分`, 400, 310);
-
-                ctx.font = "20px Arial";
-                ctx.fillStyle = "#eccc68";
-                ctx.fillText("按 F5 重新整理頁面即可再次挑戰！", 400, 380);
             }
+        }
+
+        function endGame() {
+            // 儲存至排行榜 (LocalStorage)
+            saveToLeaderboard({
+                name: studentInfo.name,
+                class: studentInfo.class,
+                date: studentInfo.date,
+                score: score
+            });
+
+            document.getElementById('final-score-text').innerText = `${studentInfo.class} ${studentInfo.name} 最終得分：${score} 分`;
+            updateLeaderboardUI();
+            document.getElementById('end-overlay').style.display = 'flex';
+        }
+
+        function saveToLeaderboard(newEntry) {
+            let list = JSON.parse(localStorage.getItem('math_racing_leaderboard') || '[]');
+            list.push(newEntry);
+            list.sort((a, b) => b.score - a.score); // 依分數高低排序
+            list = list.slice(0, 5); // 保留前五名
+            localStorage.setItem('math_racing_leaderboard', JSON.stringify(list));
+        }
+
+        function updateLeaderboardUI() {
+            const list = JSON.parse(localStorage.getItem('math_racing_leaderboard') || '[]');
+            const tbody = document.getElementById('leaderboard-body');
+            tbody.innerHTML = '';
+
+            list.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.date}</td>
+                    <td>${item.class}</td>
+                    <td>${item.name}</td>
+                    <td style="color:#eccc68; font-weight:bold;">${item.score}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function restartGame() {
+            document.getElementById('end-overlay').style.display = 'none';
+            document.getElementById('start-overlay').style.display = 'flex';
         }
     </script>
 </body>
