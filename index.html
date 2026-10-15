@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小六分數小數互化體感賽車 - 炫彩視覺版</title>
+    <title>小六分數小數互化體感賽車 - 老師管理版</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
     <style>
@@ -61,6 +61,13 @@
         }
         .btn:active { transform: scale(0.95); }
         
+        .sm-btn {
+            padding: 4px 10px; font-size: 13px; border-radius: 6px; border: none;
+            cursor: pointer; font-weight: bold; margin: 0 2px;
+        }
+        .btn-edit { background: #eccc68; color: #000; }
+        .btn-del { background: #ff4757; color: #fff; }
+
         table {
             width: 95%; border-collapse: collapse; margin-top: 10px;
             background: #1f2833; border-radius: 8px; overflow: hidden; font-size: 14px;
@@ -75,6 +82,13 @@
             cursor: pointer; z-index: 15;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
+
+        #teacher-btn {
+            position: absolute; top: 15px; left: 15px;
+            background: rgba(69, 162, 158, 0.3); color: #66fcf1;
+            border: 1px solid #66fcf1; padding: 6px 12px; border-radius: 15px;
+            font-size: 13px; cursor: pointer; z-index: 30;
+        }
     </style>
 </head>
 <body>
@@ -85,11 +99,12 @@
             <video id="webcam" autoplay playsinline muted></video>
         </div>
         <button id="recalibrate-btn" onclick="recalibrateCenter()">🎯 校準頭部位置</button>
+        <button id="teacher-btn" onclick="openTeacherPanel()">⚙️ 老師管理</button>
 
         <!-- 設定與啟動頁面 -->
         <div id="start-overlay" class="overlay">
             <h1 style="font-size: 32px; margin-bottom: 5px; color: #66fcf1; text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);">🏎️ 小六分數小數互化體感賽車</h1>
-            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜極速炫彩美化版</p>
+            <p style="color: #c5c6c7; margin-bottom: 20px;">分母 2, 4, 5, 8 專題練習｜管理員維護版</p>
             
             <div class="form-group">
                 <input type="text" id="student-class" placeholder="班別 (例: 6A)" style="width: 130px;">
@@ -117,22 +132,26 @@
             <div id="loading-text" style="color: #66fcf1; margin-top: 10px;"></div>
         </div>
 
-        <!-- 英雄榜頁面 -->
+        <!-- 英雄榜與管理頁面 -->
         <div id="end-overlay" class="overlay" style="display: none;">
-            <h2 style="font-size: 30px; margin: 0 0 5px 0; color: #ff007f; text-shadow: 0 0 10px rgba(255, 0, 127, 0.5);">🎉 挑戰結束！</h2>
+            <h2 id="end-title" style="font-size: 30px; margin: 0 0 5px 0; color: #ff007f; text-shadow: 0 0 10px rgba(255, 0, 127, 0.5);">🎉 挑戰結束！</h2>
             <p id="final-score-text" style="font-size: 22px; margin-bottom: 10px; color: #66fcf1;"></p>
             
-            <h3 style="margin: 5px 0; color: #ffda79;">🏆 班級英雄榜 (Top 10)</h3>
+            <div style="display: flex; justify-content: space-between; width: 95%; align-items: center;">
+                <h3 style="margin: 5px 0; color: #ffda79;">🏆 班級英雄榜 (Top 10)</h3>
+                <button id="clear-all-btn" class="sm-btn btn-del" onclick="clearAllData()" style="display: none; padding: 6px 12px;">🗑️ 一鍵清空所有紀錄</button>
+            </div>
+
             <div style="max-height: 280px; overflow-y: auto; width: 100%; display: flex; justify-content: center;">
                 <table id="leaderboard-table">
                     <thead>
-                        <tr><th>名次</th><th>日期</th><th>班別</th><th>姓名</th><th>得分</th></tr>
+                        <tr><th>名次</th><th>日期</th><th>班別</th><th>姓名</th><th>得分</th><th class="admin-col" style="display:none;">操作</th></tr>
                     </thead>
                     <tbody id="leaderboard-body"></tbody>
                 </table>
             </div>
 
-            <button class="btn" onclick="restartGame()" style="margin-top: 15px;">再次挑戰 🔄</button>
+            <button class="btn" onclick="restartGame()" style="margin-top: 15px;">返回主選單 🔄</button>
         </div>
     </div>
 
@@ -146,12 +165,13 @@
         let selectedCarStyle = "classic";
 
         let score = 0, timeLeft = 60, gameActive = false, isCalibrated = false;
+        let isAdminMode = false;
         let currentLane = 1;
         const laneXPositions = [133, 400, 666];
 
         let currentProblem = { question: "", options: [], correctLane: 1 };
         let obstacleY = -60, obstacleSpeed = 3.2;
-        let roadOffset = 0; // 動態賽車跑道條紋偏移量
+        let roadOffset = 0;
         let statusMsg = "請面向鏡頭正中間進行校準...";
         let baseCenterX = null;
         const sensitivityThreshold = 18;
@@ -279,7 +299,7 @@
             playSound('engine');
             document.getElementById('start-overlay').style.display = 'none';
 
-            score = 0; timeLeft = 60; isCalibrated = false;
+            score = 0; timeLeft = 60; isCalibrated = false; isAdminMode = false;
             generateProblem();
 
             requestAnimationFrame(gameLoop);
@@ -351,18 +371,14 @@
             else requestAnimationFrame(detectPoseLoop);
         }
 
-        // 🎨 美化版數字/答案格 (炫彩霓虹立體能量箱)
         function drawOptionBlock(x, y, text) {
             const w = 140, h = 55, r = 12;
-
             ctx.save();
             ctx.translate(x - w / 2, y);
 
-            // 外發光陰影
             ctx.shadowColor = "#66fcf1";
             ctx.shadowBlur = 12;
 
-            // 箱體暗色漸層背景
             const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
             bgGrad.addColorStop(0, "#1f2833");
             bgGrad.addColorStop(1, "#0b0c10");
@@ -372,7 +388,6 @@
             ctx.roundRect(0, 0, w, h, r);
             ctx.fill();
 
-            // 箱體金屬霓虹邊框
             const borderGrad = ctx.createLinearGradient(0, 0, w, h);
             borderGrad.addColorStop(0, "#66fcf1");
             borderGrad.addColorStop(0.5, "#45a29e");
@@ -381,32 +396,27 @@
             ctx.lineWidth = 3;
             ctx.stroke();
 
-            // 頂部高光線 (增加 3D 浮雕立體感)
             ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(r, 3); ctx.lineTo(w - r, 3);
             ctx.stroke();
 
-            ctx.shadowBlur = 0; // 清除陰影
+            ctx.shadowBlur = 0;
 
-            // 渲染文字 (立體感與文字邊框)
             ctx.font = "bold 26px Arial, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
 
-            // 文字陰影
             ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
             ctx.fillText(text, w / 2 + 2, h / 2 + 2);
 
-            // 主文字顏色
             ctx.fillStyle = "#ffffff";
             ctx.fillText(text, w / 2, h / 2);
 
             ctx.restore();
         }
 
-        // 🏎️ 美化版立體跑車
         function drawCar(x, y, color, style) {
             ctx.save();
             ctx.translate(x, y);
@@ -422,7 +432,6 @@
             ctx.fillRect(-28, 15, 8, 18);
             ctx.fillRect(20, 15, 8, 18);
 
-            // 車身流線漸層
             const carGrad = ctx.createLinearGradient(-20, 0, 20, 0);
             carGrad.addColorStop(0, color);
             carGrad.addColorStop(0.5, "#ffffff");
@@ -461,25 +470,21 @@
         }
 
         function gameLoop() {
-            // 背景底色
             ctx.fillStyle = "#0b0c10";
             ctx.fillRect(0, 0, 800, 600);
 
-            // 動態跑道背景
             roadOffset = (roadOffset + obstacleSpeed) % 40;
             ctx.strokeStyle = "rgba(102, 252, 241, 0.15)";
             ctx.lineWidth = 2;
 
-            // 跑道虛線
             ctx.setLineDash([20, 20]);
             ctx.lineDashOffset = -roadOffset;
             ctx.beginPath();
             ctx.moveTo(266, 0); ctx.lineTo(266, 600);
             ctx.moveTo(533, 0); ctx.lineTo(533, 600);
             ctx.stroke();
-            ctx.setLineDash([]); // 還原實線
+            ctx.setLineDash([]);
 
-            // 跑道兩側線
             ctx.strokeStyle = "#45a29e";
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -487,7 +492,6 @@
             ctx.moveTo(790, 0); ctx.lineTo(790, 600);
             ctx.stroke();
 
-            // 校準提示
             if (!isCalibrated) {
                 ctx.fillStyle = "rgba(11, 12, 16, 0.7)";
                 ctx.fillRect(0, 0, 800, 600);
@@ -509,12 +513,10 @@
             if (gameActive) {
                 obstacleY += obstacleSpeed;
 
-                // 繪製美化後的 3 個答案箱
                 for (let i = 0; i < 3; i++) {
                     drawOptionBlock(laneXPositions[i], obstacleY, currentProblem.options[i]);
                 }
 
-                // 碰撞判定
                 if (obstacleY >= 440 && obstacleY <= 490) {
                     if (currentLane === currentProblem.correctLane) {
                         score += 10;
@@ -523,17 +525,15 @@
                     } else {
                         score = Math.max(0, score - 5);
                         playSound('wrong');
-                        obstacleY = -60; // 錯題補答重置
+                        obstacleY = -60;
                     }
                 } else if (obstacleY > 600) {
                     obstacleY = -60;
                 }
 
-                // 畫賽車
                 const carX = laneXPositions[currentLane];
                 drawCar(carX, 490, selectedCarColor, selectedCarStyle);
 
-                // HUD 頂部科技面板
                 ctx.fillStyle = "rgba(31, 40, 51, 0.85)";
                 ctx.beginPath();
                 ctx.roundRect(150, 10, 500, 75, 12);
@@ -551,7 +551,6 @@
                 ctx.fillStyle = "#ffda79";
                 ctx.fillText(statusMsg, 400, 70);
 
-                // 得分與時間資訊
                 ctx.font = "bold 18px Arial";
                 ctx.fillStyle = "#ffffff";
                 ctx.textAlign = "left";
@@ -571,7 +570,9 @@
                 date: studentInfo.date, score: score
             });
 
+            document.getElementById('end-title').innerText = "🎉 挑戰結束！";
             document.getElementById('final-score-text').innerText = `${studentInfo.class} ${studentInfo.name} 最終得分：${score} 分`;
+            isAdminMode = false;
             updateLeaderboardUI();
             document.getElementById('end-overlay').style.display = 'flex';
         }
@@ -589,6 +590,13 @@
             const tbody = document.getElementById('leaderboard-body');
             tbody.innerHTML = '';
 
+            // 控制管理者功能欄位顯隱
+            const adminCols = document.querySelectorAll('.admin-col');
+            const clearBtn = document.getElementById('clear-all-btn');
+            
+            adminCols.forEach(col => col.style.display = isAdminMode ? 'table-cell' : 'none');
+            clearBtn.style.display = isAdminMode ? 'inline-block' : 'none';
+
             list.forEach((item, index) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -597,9 +605,70 @@
                     <td>${item.class}</td>
                     <td>${item.name}</td>
                     <td style="color:#ffda79; font-weight:bold;">${item.score}</td>
+                    ${isAdminMode ? `
+                        <td class="admin-col">
+                            <button class="sm-btn btn-edit" onclick="editEntry(${index})">編輯</button>
+                            <button class="sm-btn btn-del" onclick="deleteEntry(${index})">刪除</button>
+                        </td>
+                    ` : ''}
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // ⚙️ 老師管理專區
+        function openTeacherPanel() {
+            const pwd = prompt("請輸入老師管理密碼 (預設: 9878):");
+            if (pwd === "1234") {
+                isAdminMode = true;
+                document.getElementById('end-title').innerText = "⚙️ 排行榜老師管理後台";
+                document.getElementById('final-score-text').innerText = "提示：您可以在此修改學生姓名、班別、分數，或刪除單筆紀錄。";
+                updateLeaderboardUI();
+                document.getElementById('end-overlay').style.display = 'flex';
+            } else if (pwd !== null) {
+                alert("密碼錯誤！");
+            }
+        }
+
+        function editEntry(index) {
+            let list = JSON.parse(localStorage.getItem('math_racing_leaderboard') || '[]');
+            const item = list[index];
+
+            const newClass = prompt("請輸入新的班別:", item.class);
+            if (newClass === null) return;
+
+            const newName = prompt("請輸入新的學生姓名:", item.name);
+            if (newName === null) return;
+
+            const newScore = prompt("請輸入新的得分:", item.score);
+            if (newScore === null) return;
+
+            list[index] = {
+                class: newClass.trim(),
+                name: newName.trim(),
+                score: parseInt(newScore, 10) || 0,
+                date: item.date
+            };
+
+            list.sort((a, b) => b.score - a.score);
+            localStorage.setItem('math_racing_leaderboard', JSON.stringify(list));
+            updateLeaderboardUI();
+        }
+
+        function deleteEntry(index) {
+            if (confirm("確定要刪除這筆紀錄嗎？")) {
+                let list = JSON.parse(localStorage.getItem('math_racing_leaderboard') || '[]');
+                list.splice(index, 1);
+                localStorage.setItem('math_racing_leaderboard', JSON.stringify(list));
+                updateLeaderboardUI();
+            }
+        }
+
+        function clearAllData() {
+            if (confirm("⚠️ 確定要一鍵清空整個排行榜嗎？（清空後無法復原）")) {
+                localStorage.removeItem('math_racing_leaderboard');
+                updateLeaderboardUI();
+            }
         }
 
         function restartGame() {
